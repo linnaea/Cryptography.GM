@@ -1,3 +1,4 @@
+// ReSharper disable once RedundantUsingDirective
 using System.Buffers;
 using System.Numerics;
 using System.Security.Cryptography.Primitives;
@@ -67,12 +68,37 @@ namespace System.Security.Cryptography
             yv.CopyTo(key, pkBytes);
             za.CopyTo(key, pkBytes * 2);
             zb.CopyTo(key, pkBytes * 2 + za.Length);
-            
+
             var kdf = new SM2DeriveBytes(key, _hash);
 
             var ra = _responder ? peerR : _ephemeralKey.Q;
             var rb = _responder ? _ephemeralKey.Q : peerR;
 
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+            _hash.Initialize();
+            _hash.TransformBlock(xv, 0, pkBytes, null, 0);
+            _hash.TransformBlock(za, 0, za.Length, null, 0);
+            _hash.TransformBlock(zb, 0, zb.Length, null, 0);
+            _hash.TransformBlock(ra.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            _hash.TransformBlock(ra.Y.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            _hash.TransformBlock(rb.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            _hash.TransformFinalBlock(rb.Y.ToByteArrayUBe(pkBytes), 0, pkBytes);
+            var si = _hash.Hash;
+            
+            _hash.Initialize();
+            key[0] = 2;
+            _hash.TransformBlock(key, 0, 1, null, 0);
+            _hash.TransformBlock(yv, 0, pkBytes, null, 0);
+            _hash.TransformFinalBlock(si, 0, si.Length);
+            var sb = _hash.Hash;
+            
+            _hash.Initialize();
+            key[0] = 3;
+            _hash.TransformBlock(key, 0, 1, null, 0);
+            _hash.TransformBlock(yv, 0, pkBytes, null, 0);
+            _hash.TransformFinalBlock(si, 0, si.Length);
+            var sa = _hash.Hash;
+#else
             var sib = ArrayPool<byte>.Shared.Rent(pkBytes * 5 + zl);
             xv.CopyTo(sib, 0);
             za.CopyTo(sib, pkBytes);
@@ -93,6 +119,7 @@ namespace System.Security.Cryptography
             sbb[0] = 3;
             var sa = _hash.ComputeHash(sbb, 0, pkBytes + si.Length + 1);
             ArrayPool<byte>.Shared.Return(sbb);
+#endif
 
             return (kdf, _responder ? sb : sa, _responder ? sa : sb);
         }

@@ -13,7 +13,7 @@ namespace Cryptography.GM.ECMath
         BigInteger H { get; }
         ushort BitLength { get; }
         IEcCurve Curve { get; }
-#if NETSTANDARD1_6
+#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETSTANDARD2_1
         ECCurve ToEcCurve();
 #endif
     }
@@ -36,7 +36,7 @@ namespace Cryptography.GM.ECMath
         public BigInteger D { get; set; }
         public IEcParameter Param { get; set; }
 
-#if NETSTANDARD1_6
+#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETSTANDARD2_1
         public static implicit operator ECParameters(EcKeyPair p) =>
             new ECParameters {
                 Curve = p.Param.ToEcCurve(),
@@ -95,7 +95,7 @@ namespace Cryptography.GM.ECMath
             }
         }
 
-#if NETSTANDARD1_6
+#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETSTANDARD2_1
         public static implicit operator EcPoint(ECPoint p)
         {
             if (p.X == null || p.Y == null)

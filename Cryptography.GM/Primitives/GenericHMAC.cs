@@ -1,35 +1,43 @@
+// ReSharper disable RedundantUsingDirective
+// ReSharper disable InconsistentNaming
 using System.Linq;
 using System.Reflection;
-// ReSharper disable InconsistentNaming
 
 namespace System.Security.Cryptography.Primitives
 {
-    public class GenericHMAC<T> : KeyedHashAlgorithm where T: HashAlgorithm
+    public class GenericHMAC<T> : HMAC where T: HashAlgorithm
     {
-        private readonly MethodInfo _hashCore;
-        private readonly MethodInfo _hashFinal;
+#if !(NETSTANDARD2_0 || NETSTANDARD2_1)
+        // ReSharper disable StaticMemberInGenericType
+        private static readonly MethodInfo _hashCore;
+        private static readonly MethodInfo _hashFinal;
+        // ReSharper restore StaticMemberInGenericType
+
+        static GenericHMAC() {
+            var typeMethods = typeof(T).GetRuntimeMethods()
+                                   .Where(v => !v.IsPrivate && !v.IsPublic && v.IsVirtual && !v.IsStatic).ToArray();
+            _hashCore = typeMethods.Single(v => v.Name == nameof(HashCore) && v.GetParameters().Length == 3);
+            _hashFinal = typeMethods.Single(v => v.Name == nameof(HashFinal) && v.GetParameters().Length == 0);
+        }
+#endif
+
         private readonly int _blockBytes;
         private readonly byte[] _rgbInner;
         private readonly byte[] _rgbOuter;
         private byte[] _keyValue = Array.Empty<byte>();
         private bool _hashing;
 
-        protected readonly T Hash;
+        protected readonly T Hasher;
 
-        public sealed override int HashSize => Hash.HashSize;
+        public sealed override int HashSize => Hasher.HashSize;
 
-        public GenericHMAC(T hash, int blockBytes, byte[] rgbKey)
+        public GenericHMAC(T hasher, int blockBytes, byte[] rgbKey)
         {
-            Hash = hash;
+            Hasher = hasher;
             _blockBytes = blockBytes;
             _rgbInner = new byte[blockBytes];
             _rgbOuter = new byte[blockBytes];
             Key = rgbKey;
-
-            var typeMethods = Hash.GetType().GetRuntimeMethods()
-                                   .Where(v => !v.IsPrivate && !v.IsPublic && v.IsVirtual && !v.IsStatic).ToArray();
-            _hashCore = typeMethods.Single(v => v.Name == nameof(HashCore) && v.GetParameters().Length == 3);
-            _hashFinal = typeMethods.Single(v => v.Name == nameof(HashFinal) && v.GetParameters().Length == 0);
         }
 
         public sealed override byte[] Key {
@@ -40,7 +48,7 @@ namespace System.Security.Cryptography.Primitives
                 }
 
                 if (value.Length > _blockBytes) {
-                    _keyValue = Hash.ComputeHash(value);
+                    _keyValue = Hasher.ComputeHash(value);
                 } else {
                     _keyValue = (byte[]) value.Clone();
                 }
@@ -59,13 +67,22 @@ namespace System.Security.Cryptography.Primitives
 
         public sealed override void Initialize()
         {
-            Hash.Initialize();
+            Hasher.Initialize();
             _hashing = false;
         }
 
-        protected virtual void AddHashData(byte[] rgb, int ib, int cb) => _hashCore.Invoke(Hash, new object[] {rgb, ib, cb});
-        protected virtual byte[] FinalizeInnerHash() => (byte[]) _hashFinal.Invoke(Hash, Array.Empty<object>());
-        
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+        protected virtual void AddHashData(byte[] rgb, int ib, int cb) => Hasher.TransformBlock(rgb, ib, cb, null, 0);
+        protected virtual byte[] FinalizeInnerHash()
+        {
+            Hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            return Hasher.Hash;
+        }
+#else
+        protected virtual void AddHashData(byte[] rgb, int ib, int cb) => _hashCore.Invoke(Hasher, new object[] {rgb, ib, cb});
+        protected virtual byte[] FinalizeInnerHash() => (byte[]) _hashFinal.Invoke(Hasher, Array.Empty<object>());
+#endif
+
         private void EnsureStarted()
         {
             if (_hashing) return;
@@ -83,7 +100,7 @@ namespace System.Security.Cryptography.Primitives
         {
             EnsureStarted();
             var hashInner = FinalizeInnerHash();
-            Hash.Initialize();
+            Hasher.Initialize();
             AddHashData(_rgbOuter, 0, _blockBytes);
             AddHashData(hashInner, 0, hashInner.Length);
             _hashing = false;
@@ -92,7 +109,7 @@ namespace System.Security.Cryptography.Primitives
 
         protected override void Dispose(bool disposing)
         {
-            if(disposing) Hash.Dispose();
+            if(disposing) Hasher.Dispose();
             base.Dispose(disposing);
         }
     }

@@ -11,23 +11,23 @@ namespace Cryptography.GM.ECMath
 {
     public class FpParameter : IEcParameter
     {
-        private BigInteger _n;
-        public EcPoint G { get; set; }
-        public FpCurve Curve { get; set; }
-        public ushort BitLength { get; private set; }
+        public EcPoint G { get; }
+        public FpCurve Curve { get; }
+        public ushort BitLength { get; }
         public BigInteger H => BigInteger.One;
+        public BigInteger N { get; }
 
-        public BigInteger N {
-            get => _n;
-            set {
-                _n = value;
-                BitLength = (ushort) value.BitLength();
-            }
+        public FpParameter(FpCurve curve, EcPoint g, BigInteger n)
+        {
+            Curve = curve;
+            G = g;
+            N = n;
+            BitLength = (ushort) n.BitLength();
         }
 
         IEcCurve IEcParameter.Curve => Curve;
 
-#if NETSTANDARD1_6
+#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETSTANDARD2_1
         ECCurve IEcParameter.ToEcCurve() => this;
 
         public static implicit operator ECCurve(FpParameter p) =>
@@ -44,47 +44,48 @@ namespace Cryptography.GM.ECMath
 
         // ReSharper disable once InconsistentNaming
         [SuppressMessage("ReSharper", "StringLiteralTypo")]
-        public static readonly FpParameter SM2StandardParam = new FpParameter {
-            Curve = new FpCurve {
-                P = BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF",
-                                     NumberStyles.HexNumber),
-                A = BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC",
-                                     NumberStyles.HexNumber),
-                B = BigInteger.Parse("028E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93",
-                                     NumberStyles.HexNumber)
-            },
-            N = BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123",
+        public static readonly FpParameter SM2StandardParam = new FpParameter(
+            new FpCurve(
+                BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF",
                                  NumberStyles.HexNumber),
-            G = new EcPoint(
+                BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC",
+                                 NumberStyles.HexNumber),
+                BigInteger.Parse("028E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93",
+                                 NumberStyles.HexNumber)
+            ),
+            new EcPoint(
                 BigInteger.Parse("032C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7",
                                  NumberStyles.HexNumber),
                 BigInteger.Parse("0BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0",
                                  NumberStyles.HexNumber)
-            )
-        };
+            ),
+            BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123",
+                             NumberStyles.HexNumber)
+        );
     }
 
     public class FpCurve : IEcCurve
     {
-        private BigInteger _p;
-        private BigInteger _inv2;
-        private BigInteger _eulerPower;
+        private readonly BigInteger _inv2;
+        private readonly BigInteger _eulerPower;
 
-        public BigInteger P {
-            get => _p;
-            set {
-                _p = value;
-                _eulerPower = (value - 1) / 2;
-                _inv2 = 2;
-                _inv2 = _inv2.InvMod(_p);
-                BitLength = (ushort) value.BitLength();
-            }
+        public BigInteger P { get; }
+        public BigInteger A { get; }
+        public BigInteger B { get; }
+        public ushort BitLength { get; }
+
+        public FpCurve(BigInteger p, BigInteger a, BigInteger b)
+        {
+            P = p;
+            A = a;
+            B = b;
+            BitLength = (ushort) p.BitLength();
+            _eulerPower = (p - 1) / 2;
+            _inv2 = 2;
+            _inv2 = _inv2.InvMod(p);
         }
-        public BigInteger A { get; set; }
-        public BigInteger B { get; set; }
-        public ushort BitLength { get; private set; }
 
-        private bool IsQuadraticResidue(BigInteger v) => BigInteger.ModPow(v, _eulerPower, _p).IsOne;
+        private bool IsQuadraticResidue(BigInteger v) => BigInteger.ModPow(v, _eulerPower, P).IsOne;
 
         private BigInteger Sqrt(BigInteger x, AnyRng rng)
         {
@@ -104,9 +105,9 @@ namespace Cryptography.GM.ECMath
             }
 
             var m = s;
-            var c = BigInteger.ModPow(z, q, _p);
-            var t = BigInteger.ModPow(x, q, _p);
-            var r = BigInteger.ModPow(x, q / 2 + 1, _p);
+            var c = BigInteger.ModPow(z, q, P);
+            var t = BigInteger.ModPow(x, q, P);
+            var r = BigInteger.ModPow(x, q / 2 + 1, P);
             while (true) {
                 if (t.IsZero) {
                     return BigInteger.Zero;
@@ -116,7 +117,7 @@ namespace Cryptography.GM.ECMath
                 }
                 ulong i = 1;
                 while (i < m) {
-                    if (BigInteger.ModPow(t, BigInteger.ModPow(2, i, _p), _p).IsOne)
+                    if (BigInteger.ModPow(t, BigInteger.ModPow(2, i, P), P).IsOne)
                         break;
                     i++;
                 }
@@ -124,11 +125,11 @@ namespace Cryptography.GM.ECMath
                 if(i == m)
                     throw new InvalidOperationException();
 
-                var b = BigInteger.ModPow(c, BigInteger.ModPow(2, m - i - 1, _p), _p);
+                var b = BigInteger.ModPow(c, BigInteger.ModPow(2, m - i - 1, P), P);
                 m = i;
-                c = b * b % _p;
-                t = t * b * b % _p;
-                r = r * b % _p;
+                c = b * b % P;
+                t = t * b * b % P;
+                r = r * b % P;
             }
         }
 
@@ -139,7 +140,7 @@ namespace Cryptography.GM.ECMath
             var r = Sqrt(rhs, rng);
 
             if (r.IsZero) return r;
-            if (lsbSet == r.IsEven) r = _p - r;
+            if (lsbSet == r.IsEven) r = P - r;
             return r;
         }
 
@@ -377,7 +378,7 @@ namespace Cryptography.GM.ECMath
             };
         }
 
-#if NETSTANDARD1_6
+#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETSTANDARD2_1
         public static implicit operator JacobianEcPoint(ECPoint p)
         {
             if (p.X == null || p.Y == null)

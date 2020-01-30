@@ -89,7 +89,11 @@ namespace System.Security.Cryptography
             }
         }
 
-        public void HashCore(ReadOnlySpan<byte> buf) => HashCoreBits(buf, (uint)buf.Length * 8);
+#if NETSTANDARD2_1
+        protected override void HashCore(ReadOnlySpan<byte> buf) => HashCoreBits(buf, (uint)buf.Length * 8);
+#else
+        private void HashCore(ReadOnlySpan<byte> buf) => HashCoreBits(buf, (uint)buf.Length * 8);
+#endif
 
         public byte[] FinalizeHash()
         {
@@ -134,7 +138,9 @@ namespace System.Security.Cryptography
         public HMACSM3(byte[] rgbKey) : base(new SM3(), 64, rgbKey)
         { }
 
-        protected override byte[] FinalizeInnerHash() => Hash.FinalizeHash();
-        protected override void AddHashData(byte[] rgb, int ib, int cb) => Hash.HashCore(rgb.AsSpan(ib, cb));
+        protected override byte[] FinalizeInnerHash() => Hasher.FinalizeHash();
+
+        protected override void AddHashData(byte[] rgb, int ib, int cb)
+            => Hasher.HashCoreBits(rgb.AsSpan(ib, cb), (uint)cb * 8);
     }
 }

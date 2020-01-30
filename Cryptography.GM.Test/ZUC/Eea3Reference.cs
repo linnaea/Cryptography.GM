@@ -218,7 +218,7 @@ namespace Cryptography.GM.Test.ZUC
         }
 
         [Theory]
-        [MemberData(nameof(GenerateRandomTest), 6)]
+        [MemberData(nameof(GenerateRandomTest), 5)]
         public void TestXfrmReuse(byte[] sk, byte[] iv, ZucVersion version, byte[] input)
         {
             var cipher = new Eea3Transform(sk, iv, true, version);

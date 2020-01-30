@@ -11,7 +11,7 @@ namespace Cryptography.GM.Test.CryptoPrimitives
     public class CbcTransformTest
     {
         [Theory]
-        [MemberData(nameof(GenerateRandomTest), 5)]
+        [MemberData(nameof(GenerateRandomTest), 3)]
         public void TestCbc(byte[] k, byte[] iv, byte[] d)
         {
             var aes = Aes.Create();

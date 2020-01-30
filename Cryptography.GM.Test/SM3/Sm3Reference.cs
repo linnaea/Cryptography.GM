@@ -1,3 +1,4 @@
+// ReSharper disable once RedundantUsingDirective
 using System;
 using System.Linq;
 using System.Security.Cryptography;
@@ -87,6 +88,9 @@ namespace Cryptography.GM.Test.SM3
         public void Sm3Vector(byte[] hash, byte[] data)
         {
             var hasher = new System.Security.Cryptography.SM3();
+#if NETCOREAPP1_1
+            Assert.Equal(hash.AsEnumerable(), hasher.ComputeHash(data));
+#else
             var rng = new Random();
             var offset = 0;
             while (offset < data.Length) {
@@ -97,6 +101,7 @@ namespace Cryptography.GM.Test.SM3
 
             hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
             Assert.Equal(hash.AsEnumerable(), hasher.Hash);
+#endif
         }
 
         [Theory]

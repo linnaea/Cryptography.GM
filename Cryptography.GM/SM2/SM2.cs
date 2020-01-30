@@ -12,7 +12,7 @@ namespace System.Security.Cryptography
     public class SM2 : AsymmetricAlgorithm
     {
         private readonly AnyRng _rng;
-        private readonly HashAlgorithm _hash;
+        private HashAlgorithm _hash;
         private IEcParameter _param;
         private BigInteger _privateKey;
         private EcPoint _pubKey;
@@ -20,16 +20,23 @@ namespace System.Security.Cryptography
 
         private SM2(IEcParameter param, HashAlgorithm hash, AnyRng rng)
         {
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+            if(!hash.CanReuseTransform || !hash.CanTransformMultipleBlocks || hash.InputBlockSize != 1)
+                throw new ArgumentException(nameof(hash));
+#endif
+
             _rng = rng;
             _hash = hash;
             _param = param;
             _ident = Array.Empty<byte>();
         }
 
+#pragma warning disable 108
         public static SM2 Create() => Create(new SM3(), RandomNumberGenerator.Create());
         public static SM2 Create(HashAlgorithm hash) => Create(hash, RandomNumberGenerator.Create());
         public static SM2 Create(AnyRng rng) => Create(new SM3(), rng);
         public static SM2 Create(HashAlgorithm hash, AnyRng rng) => new SM2(FpParameter.SM2StandardParam, hash, rng);
+#pragma warning restore 108
 
         public byte[] Ident {
             get => (byte[]) _ident.Clone();
@@ -57,6 +64,7 @@ namespace System.Security.Cryptography
             new KeySizes(KeySize, KeySize, 0)
         };
 
+#region GM/T 0003.1-2012 Generals
         public EcKeyPair GenerateKeyPair()
         {
             var pk = _rng.NextBigInt(BigInteger.One, _param.N - 1);
@@ -154,6 +162,21 @@ namespace System.Security.Cryptography
 
             var pkBytes = (param.Curve.BitLength + 7) / 8;
 
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+            hash.Initialize();
+            var z = ArrayPool<byte>.Shared.Rent(2 + identity.Length);
+            BitOps.WriteU16Be(z, (ushort) (identity.Length * 8));
+            identity.CopyTo(z.AsSpan(2));
+            hash.TransformBlock(z, 0, identity.Length + 2, null, 0);
+            ArrayPool<byte>.Shared.Return(z);
+            hash.TransformBlock(param.Curve.A.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            hash.TransformBlock(param.Curve.B.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            hash.TransformBlock(param.G.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            hash.TransformBlock(param.G.Y.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            hash.TransformBlock(pubKey.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
+            hash.TransformFinalBlock(pubKey.Y.ToByteArrayUBe(pkBytes), 0, pkBytes);
+            return hash.Hash;
+#else
             var z = ArrayPool<byte>.Shared.Rent(2 + identity.Length + pkBytes * 6);
             BitOps.WriteU16Be(z, (ushort) (identity.Length * 8));
             identity.CopyTo(z.AsSpan(2));
@@ -167,7 +190,9 @@ namespace System.Security.Cryptography
             var h = hash.ComputeHash(z, 0, 2 + identity.Length + pkBytes * 6);
             ArrayPool<byte>.Shared.Return(z);
             return h;
+#endif
         }
+#endregion
 
 #region GM/T 0003.2-2012 Digital Signature
         public (BigInteger r, BigInteger s) SignHash(BigInteger e)
