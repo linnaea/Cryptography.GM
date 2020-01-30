@@ -1,0 +1,70 @@
+using System;
+using System.Linq;
+using System.Security.Cryptography;
+using Xunit;
+
+namespace Cryptography.GM.Test.ZUC
+{
+    public class Zuc256MacReference
+    {
+        [Theory]
+        [InlineData(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    0, 50, 0x9b972a74u, 0x673e54990034d38cul, new byte[] {
+                        0xd8, 0x5e, 0x54, 0xbb, 0xcb, 0x96, 0x00, 0x96, 0x70, 0x84, 0xc9, 0x52, 0xa1, 0x65, 0x4b, 0x26
+                    })]
+        [InlineData(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    0x11, 500, 0x8754f5cfu, 0x130dc225e72240ccul, new byte[] {
+                        0xdf, 0x1e, 0x83, 0x07, 0xb3, 0x1c, 0xc6, 0x2b, 0xec, 0xa1, 0xac, 0x6f, 0x81, 0x90, 0xc2, 0x2f
+                    })]
+        [InlineData(new byte[] {
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+                    },
+                    new byte[] {
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+                    },
+                    0, 50, 0x1f3079b4u, 0x8c71394d39957725ul, new byte[] {
+                        0xa3, 0x5b, 0xb2, 0x74, 0xb5, 0x67, 0xc4, 0x8b, 0x28, 0x31, 0x9f, 0x11, 0x1a, 0xf3, 0x4f, 0xbd
+                    })]
+        [InlineData(new byte[] {
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+                    },
+                    new byte[] {
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+                    },
+                    0x11, 500, 0x5c7c8b88u, 0xea1dee544bb6223bul, new byte[] {
+                        0x3a, 0x83, 0xb5, 0x54, 0xbe, 0x40, 0x8c, 0xa5, 0x49, 0x41, 0x24, 0xed, 0x9d, 0x47, 0x32, 0x05
+                    })]
+        public void TestVector(byte[] sk, byte[] iv, byte msgUni, int msgLenBytes, uint mac32, ulong mac64, byte[] mac128)
+        {
+            var macKey = new byte[55];
+            var msg = new byte[msgLenBytes];
+            for (var i = 0; i < msg.Length; i++) msg[i] = msgUni;
+            sk.CopyTo(macKey, 0);
+            iv.CopyTo(macKey, 32);
+            var m32 = new Zuc256Mac32(macKey);
+            var m64 = new Zuc256Mac64(macKey);
+            var m128 = new Zuc256Mac128(macKey);
+
+            m32.HashBits(msg, msgLenBytes * 8);
+            m64.HashBits(msg, msgLenBytes * 8);
+            m128.HashBits(msg, msgLenBytes * 8);
+
+            Assert.Equal(mac32, m32.FinalizeHash());
+            Assert.Equal(mac64, m64.FinalizeHash());
+            Assert.Equal(mac128.AsEnumerable(), m128.FinalizeHashBytes());
+            Assert.Equal(macKey.AsEnumerable(), m32.Key);
+        }
+
+        [Fact]
+        public void BadKeyThrows()
+        {
+            Assert.Throws<ArgumentException>(() => new Zuc256Mac32(Array.Empty<byte>()));
+        }
+    }
+}

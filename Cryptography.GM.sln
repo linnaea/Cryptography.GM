@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cryptography.GM", "Cryptography.GM\Cryptography.GM.csproj", "{6F106D7A-FD54-4C12-8318-1D3B2F3860E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cryptography.GM.Test", "Cryptography.GM.Test\Cryptography.GM.Test.csproj", "{71B39A8D-41B1-4B8E-96F9-C19818325CD0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6F106D7A-FD54-4C12-8318-1D3B2F3860E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F106D7A-FD54-4C12-8318-1D3B2F3860E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F106D7A-FD54-4C12-8318-1D3B2F3860E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F106D7A-FD54-4C12-8318-1D3B2F3860E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71B39A8D-41B1-4B8E-96F9-C19818325CD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71B39A8D-41B1-4B8E-96F9-C19818325CD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71B39A8D-41B1-4B8E-96F9-C19818325CD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71B39A8D-41B1-4B8E-96F9-C19818325CD0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
