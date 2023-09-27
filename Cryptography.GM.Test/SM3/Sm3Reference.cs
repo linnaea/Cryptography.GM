@@ -89,7 +89,7 @@ public class Sm3Reference
         }
 
         hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        Assert.Equal(hash.AsEnumerable(), hasher.Hash);
+        Assert.Equal(hash, hasher.Hash);
     }
 
     [Theory]
@@ -137,6 +137,6 @@ public class Sm3Reference
     })]
     public void HmacSm3Vector(byte[] hash, byte[] hmacKey, byte[] data)
     {
-        Assert.Equal(hash.AsEnumerable(), new HMACSM3(hmacKey).ComputeHash(data));
+        Assert.Equal(hash, new HMACSM3(hmacKey).ComputeHash(data));
     }
 }

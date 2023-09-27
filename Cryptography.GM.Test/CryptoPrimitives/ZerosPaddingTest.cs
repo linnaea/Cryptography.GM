@@ -15,7 +15,7 @@ public class ZerosPaddingTest
         var blkCipher = new NoOpSingleBlockTransform(blockSize);
         var enc = new ZerosPaddingTransform(blkCipher, false);
         var padded = enc.TransformFinalBlock(input, 0, input.Length);
-        Assert.Equal(reference.AsEnumerable(), padded);
+        Assert.Equal(reference, padded);
 
         Assert.True(enc.CanReuseTransform);
         Assert.False(enc.CanTransformMultipleBlocks);

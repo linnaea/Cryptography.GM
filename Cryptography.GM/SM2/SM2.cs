@@ -158,19 +158,22 @@ public class SM2 : AsymmetricAlgorithm
 
         var pkBytes = (param.Curve.BitLength + 7) / 8;
 
-        hash.Initialize();
         var z = ArrayPool<byte>.Shared.Rent(2 + identity.Length);
         BitOps.WriteU16Be(z, (ushort)(identity.Length * 8));
         identity.CopyTo(z.AsSpan(2));
+
         hash.TransformBlock(z, 0, identity.Length + 2, null, 0);
-        ArrayPool<byte>.Shared.Return(z);
         hash.TransformBlock(param.Curve.A.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         hash.TransformBlock(param.Curve.B.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         hash.TransformBlock(param.G.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         hash.TransformBlock(param.G.Y.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         hash.TransformBlock(pubKey.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         hash.TransformFinalBlock(pubKey.Y.ToByteArrayUBe(pkBytes), 0, pkBytes);
-        return hash.Hash;
+        var zHash = hash.Hash;
+        hash.Initialize();
+
+        ArrayPool<byte>.Shared.Return(z);
+        return zHash;
     }
 #endregion
 

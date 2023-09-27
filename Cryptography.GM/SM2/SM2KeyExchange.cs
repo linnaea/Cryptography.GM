@@ -69,11 +69,9 @@ public class SM2KeyExchange
         zb.CopyTo(key, pkBytes * 2 + za.Length);
 
         var kdf = new SM2DeriveBytes(key, _hash);
-
         var ra = _responder ? peerR : _ephemeralKey.Q;
         var rb = _responder ? _ephemeralKey.Q : peerR;
 
-        _hash.Initialize();
         _hash.TransformBlock(xv, 0, pkBytes, null, 0);
         _hash.TransformBlock(za, 0, za.Length, null, 0);
         _hash.TransformBlock(zb, 0, zb.Length, null, 0);
@@ -82,22 +80,22 @@ public class SM2KeyExchange
         _hash.TransformBlock(rb.X.ToByteArrayUBe(pkBytes), 0, pkBytes, null, 0);
         _hash.TransformFinalBlock(rb.Y.ToByteArrayUBe(pkBytes), 0, pkBytes);
         var si = _hash.Hash;
-        _hash.Initialize();
 
         key[0] = 2;
+        _hash.Initialize();
         _hash.TransformBlock(key, 0, 1, null, 0);
         _hash.TransformBlock(yv, 0, pkBytes, null, 0);
         _hash.TransformFinalBlock(si, 0, si.Length);
         var sb = _hash.Hash;
-        _hash.Initialize();
 
         key[0] = 3;
+        _hash.Initialize();
         _hash.TransformBlock(key, 0, 1, null, 0);
         _hash.TransformBlock(yv, 0, pkBytes, null, 0);
         _hash.TransformFinalBlock(si, 0, si.Length);
         var sa = _hash.Hash;
-        _hash.Initialize();
 
+        _hash.Initialize();
         return (kdf, _responder ? sb : sa, _responder ? sa : sb);
     }
 }

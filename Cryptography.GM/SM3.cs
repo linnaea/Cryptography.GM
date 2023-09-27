@@ -110,7 +110,7 @@ public sealed class SM3 : HashAlgorithm
         }
 
         WriteU64Be(finalBlock.AsSpan(finalBlock.Length - 8), messageBits);
-        HashCoreBits(SliceBits(finalBlock, finalBlockOffset), (uint)finalBlock.Length * 8 - finalBlockOffset);
+        HashCoreBits(finalBlock.SliceBits(finalBlockOffset), (uint)finalBlock.Length * 8 - finalBlockOffset);
 
         var r = new byte[32];
         for (var i = 0; i < 32; i++) {

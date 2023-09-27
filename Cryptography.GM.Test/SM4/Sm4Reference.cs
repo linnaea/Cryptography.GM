@@ -14,9 +14,9 @@ public class Sm4Reference
         var dec = new SM4Transform(key, true);
 
         var cipherText = enc.TransformFinalBlock(key, 0, key.Length);
-        Assert.Equal(expected.AsEnumerable(), cipherText);
+        Assert.Equal(expected, cipherText);
 
         var plaintext = dec.TransformFinalBlock(cipherText, 0, cipherText.Length);
-        Assert.Equal(key.AsEnumerable(), plaintext);
+        Assert.Equal(key, plaintext);
     }
 }

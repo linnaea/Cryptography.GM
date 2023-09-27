@@ -19,7 +19,7 @@ public class Pkcs7PaddingReference
         var enc = new PaddingTransform(blkCipher, PaddingMode.PKCS7, false);
         var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
         var padded = enc.TransformFinalBlock(input, 0, input.Length);
-        Assert.Equal(reference.AsEnumerable(), padded);
+        Assert.Equal(reference, padded);
 
         using (var unPadded = new MemoryStream()) {
             using (var cryptoStream = new CryptoStream(unPadded, dec, CryptoStreamMode.Write)) {
@@ -28,7 +28,7 @@ public class Pkcs7PaddingReference
                 }
             }
 
-            Assert.Equal(input.AsEnumerable(), unPadded.ToArray());
+            Assert.Equal(input, unPadded.ToArray());
         }
 
         Assert.True(enc.CanReuseTransform);

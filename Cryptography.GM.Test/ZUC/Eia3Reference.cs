@@ -117,7 +117,7 @@ public class Eia3Reference
         var hasher = new Eia3Mac(k);
         hasher.HashBits(payload, bits);
         Assert.Equal(mac, hasher.FinalizeHash());
-        Assert.Equal(k.AsEnumerable(), hasher.Key);
+        Assert.Equal(k, hasher.Key);
     }
 
     [Fact]

@@ -96,11 +96,11 @@ public class ZucReference
         new[] {
             0xbfe800d5u, 0x0360a22bu, 0x6c4554c8u, 0x67f00672u, 0x2ce94f3fu, 0xf94d12bau, 0x11c382b3u, 0xcbaf4b31u
         })]
-    public void Zuc14WeakKeyIvCollision(byte[] sk, byte[] iv1, byte[] iv2, uint[] keystream)
+    public void Zuc14WeakKeyIvCollision(byte[] sk, byte[] iv1, byte[] iv2, uint[] keyStream)
     {
         var cipher1 = new ZucKeyStreamGenerator(sk, iv1, ZucVersion.Zuc14);
         var cipher2 = new ZucKeyStreamGenerator(sk, iv2, ZucVersion.Zuc14);
-        foreach (var tv in keystream) {
+        foreach (var tv in keyStream) {
             Assert.Equal(tv, cipher1.NextKey());
             Assert.Equal(tv, cipher2.NextKey());
         }
@@ -118,9 +118,9 @@ public class ZucReference
     public void CrossLoadStateThrows(ZucVersion v)
     {
         var st14 = new ZucKeyStreamGenerator(new byte[32], new byte[23], ZucVersion.Zuc14);
-        var sttest = new ZucKeyStreamGenerator(new byte[32], new byte[23], v);
-        Assert.Throws<InvalidOperationException>(() => sttest.LoadState(st14.DumpState()));
-        Assert.Throws<InvalidOperationException>(() => st14.LoadState(sttest.DumpState()));
+        var stTest = new ZucKeyStreamGenerator(new byte[32], new byte[23], v);
+        Assert.Throws<InvalidOperationException>(() => stTest.LoadState(st14.DumpState()));
+        Assert.Throws<InvalidOperationException>(() => st14.LoadState(stTest.DumpState()));
     }
 
     [Fact]

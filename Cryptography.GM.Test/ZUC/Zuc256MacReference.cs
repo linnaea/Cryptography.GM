@@ -51,14 +51,13 @@ public class Zuc256MacReference
         var m64 = new Zuc256Mac64(macKey);
         var m128 = new Zuc256Mac128(macKey);
 
-        m32.HashBits(msg, msgLenBytes * 8);
         m64.HashBits(msg, msgLenBytes * 8);
         m128.HashBits(msg, msgLenBytes * 8);
 
-        Assert.Equal(mac32, m32.FinalizeHash());
+        Assert.Equal(mac32, BitOps.ReadU32Be(m32.ComputeHash(msg)));
         Assert.Equal(mac64, m64.FinalizeHash());
-        Assert.Equal(mac128.AsEnumerable(), m128.FinalizeHashBytes());
-        Assert.Equal(macKey.AsEnumerable(), m32.Key);
+        Assert.Equal(mac128, m128.FinalizeHashBytes());
+        Assert.Equal(macKey, m32.Key);
     }
 
     [Fact]

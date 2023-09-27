@@ -15,10 +15,10 @@ public class GenericHMACTest
     [MemberData(nameof(GenerateRandomTest), 3)]
     public void TestHMAC(byte[] k, byte[] d)
     {
-        Assert.Equal(new HMACMD5(k).ComputeHash(d).AsEnumerable(), new GenericHMAC<MD5>(MD5.Create(), 64, k).ComputeHash(d));
-        Assert.Equal(new HMACSHA1(k).ComputeHash(d).AsEnumerable(), new GenericHMAC<SHA1>(SHA1.Create(), 64, k).ComputeHash(d));
-        Assert.Equal(new HMACSHA256(k).ComputeHash(d).AsEnumerable(), new GenericHMAC<SHA256>(SHA256.Create(), 64, k).ComputeHash(d));
-        Assert.Equal(new HMACSHA512(k).ComputeHash(d).AsEnumerable(), new GenericHMAC<SHA512>(SHA512.Create(), 128, k).ComputeHash(d));
+        Assert.Equal(new HMACMD5(k).ComputeHash(d), new GenericHMAC<MD5>(MD5.Create(), 64, k).ComputeHash(d));
+        Assert.Equal(new HMACSHA1(k).ComputeHash(d), new GenericHMAC<SHA1>(SHA1.Create(), 64, k).ComputeHash(d));
+        Assert.Equal(new HMACSHA256(k).ComputeHash(d), new GenericHMAC<SHA256>(SHA256.Create(), 64, k).ComputeHash(d));
+        Assert.Equal(new HMACSHA512(k).ComputeHash(d), new GenericHMAC<SHA512>(SHA512.Create(), 128, k).ComputeHash(d));
     }
 
     [ExcludeFromCodeCoverage]

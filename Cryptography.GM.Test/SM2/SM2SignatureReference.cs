@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using Cryptography.GM.Primitives;
 using System.Text;
+using Cryptography.GM.ECMath;
 using Xunit;
 
 namespace Cryptography.GM.Test.SM2;
@@ -45,7 +46,7 @@ public class SM2SignatureReference
         var sm2 = System.Security.Cryptography.SM2.Create(rng);
         sm2.Ident = id;
         sm2.ImportPrivateKey(d);
-        Assert.Equal(q, sm2.ExportKey().Q.ToBytes(sm2));
+        Assert.Equal(q, sm2.ExportKey().Q.ToBytes(sm2, EcPointFormat.Compressed));
 
         sm2.ImportPublicKey(sm2.PointFromBytes(q).Point);
         Assert.Equal(d, sm2.ExportKey().D);

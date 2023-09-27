@@ -211,7 +211,7 @@ public class Eea3Reference
         var cipher = new Eea3Transform(sk, iv);
         var cipherOutput = new byte[plaintext.Length];
         cipher.TransformBits(plaintext, cipherOutput, bits);
-        Assert.Equal(ciphertext.AsEnumerable(), cipherOutput);
+        Assert.Equal(ciphertext, cipherOutput);
 
         cipher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         Assert.Throws<InvalidOperationException>(() => cipher.TransformBlock(plaintext, 0, bits, cipherOutput, 0));
@@ -224,7 +224,7 @@ public class Eea3Reference
         var cipher = new Eea3Transform(sk, iv, true, version);
         var cipherText = cipher.TransformFinalBlock(input, 0, input.Length);
         var plaintext = cipher.TransformFinalBlock(cipherText, 0, cipherText.Length);
-        Assert.Equal(input.AsEnumerable(), plaintext);
+        Assert.Equal(input, plaintext);
     }
 
     [ExcludeFromCodeCoverage]

@@ -44,9 +44,9 @@ public struct EcKeyPair
 
 public enum EcPointFormat
 {
+    Mixed,
     Compressed,
-    Uncompressed,
-    Mixed
+    Uncompressed
 }
 
 public struct EcPoint
@@ -67,7 +67,7 @@ public struct EcPoint
         _notInf = true;
     }
 
-    public byte[] ToBytes(AsymmetricAlgorithm a, EcPointFormat format = EcPointFormat.Compressed)
+    public byte[] ToBytes(AsymmetricAlgorithm a, EcPointFormat format = EcPointFormat.Mixed)
         => ToBytes(format, (a.KeySize + 7) / 8);
 
     public byte[] ToBytes(EcPointFormat format = EcPointFormat.Mixed, int l = -1)

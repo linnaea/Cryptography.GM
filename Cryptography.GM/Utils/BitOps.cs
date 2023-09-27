@@ -40,9 +40,20 @@ public static class BitOps
 
     public static byte[] ToByteArrayUBe(this BigInteger x, int len = -1)
     {
+#if NETSTANDARD2_1
+        var xb = x.ToByteArray(true, true);
+        if (len < 0) return xb;
+
+        if (xb.Length > len) throw new OverflowException();
+        if (xb.Length == len) return xb;
+
+        var buf = new byte[len];
+        Array.Copy(xb, 0, buf, len - xb.Length, xb.Length);
+        return buf;
+#else
         if (x.Sign < 0) throw new OverflowException();
         var xb = x.ToByteArray();
-        if (len > 0) {
+        if (len >= 0) {
             for (var i = len; i < xb.Length; i++) {
                 if (xb[i] != 0) throw new OverflowException();
             }
@@ -54,24 +65,33 @@ public static class BitOps
 
         Array.Reverse(xb);
         return xb;
+#endif
     }
 
     public static BigInteger AsBigUIntBe(this byte[] x)
     {
+#if NETSTANDARD2_1
+        return new BigInteger(x, true, true);
+#else
         var b = new byte[x.Length + 1];
         x.CopyTo(b, 1);
         Array.Reverse(b);
         var r = new BigInteger(b);
         return r;
+#endif
     }
 
     public static BigInteger AsBigUIntBe(this ReadOnlySpan<byte> x)
     {
+#if NETSTANDARD2_1
+        return new BigInteger(x, true, true);
+#else
         var b = new byte[x.Length + 1];
         x.CopyTo(b.AsSpan(1));
         Array.Reverse(b);
         var r = new BigInteger(b);
         return r;
+#endif
     }
 
     public static BigInteger InvMod(this BigInteger v, BigInteger n)

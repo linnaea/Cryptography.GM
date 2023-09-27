@@ -61,13 +61,14 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
     protected virtual byte[] FinalizeInnerHash()
     {
         Hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        return Hasher.Hash;
+        var hash = Hasher.Hash;
+        Hasher.Initialize();
+        return hash;
     }
 
     private void EnsureStarted()
     {
         if (_hashing) return;
-        Hasher.Initialize();
         AddHashData(_rgbInner, 0, _blockBytes);
         _hashing = true;
     }

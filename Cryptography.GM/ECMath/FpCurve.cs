@@ -166,9 +166,7 @@ public class FpCurve : IEcCurve
         if (p.Inf) return p;
         if (p.Y.IsZero) return p;
 
-        return new JacobianEcPoint {
-            X = p.X, Y = P - p.Y, Z = p.Z
-        };
+        return p with { Y = P - p.Y };
     }
 
     private JacobianEcPoint Add(JacobianEcPoint p1, JacobianEcPoint p2)
