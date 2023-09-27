@@ -1,67 +1,66 @@
 using System;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Security.Cryptography.Primitives;
+using Cryptography.GM.Primitives;
 using Xunit;
 
-namespace Cryptography.GM.Test.CryptoPrimitives
+namespace Cryptography.GM.Test.CryptoPrimitives;
+
+public class NoOpTransform : EcbTransform
 {
-    public class NoOpTransform : EcbTransform
+    public NoOpTransform(int blockSize)
     {
-        public NoOpTransform(int blockSize)
-        {
-            InputBlockSize = OutputBlockSize = blockSize;
-        }
-
-        public override int InputBlockSize { get; }
-        public override int OutputBlockSize { get; }
-
-        protected override void TransformOneBlock(ReadOnlySpan<byte> input, Span<byte> output)
-        {
-            input.CopyTo(output);
-        }
+        InputBlockSize = OutputBlockSize = blockSize;
     }
 
-    public class NoOpSingleBlockTransform : ICryptoTransform
+    public override int InputBlockSize { get; }
+    public override int OutputBlockSize { get; }
+
+    protected override void TransformOneBlock(ReadOnlySpan<byte> input, Span<byte> output)
     {
-        public NoOpSingleBlockTransform(int blockSize = 16)
-        {
-            InputBlockSize = OutputBlockSize = blockSize;
-        }
+        input.CopyTo(output);
+    }
+}
 
-        public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer, int outputOffset)
-        {
-            if(inputCount != InputBlockSize && inputCount != 0)
-                throw new InvalidOperationException();
-            
-            Array.Copy(inputBuffer, inputOffset, outputBuffer, outputOffset, inputCount);
-            return inputCount;
-        }
+public class NoOpSingleBlockTransform : ICryptoTransform
+{
+    public NoOpSingleBlockTransform(int blockSize = 16)
+    {
+        InputBlockSize = OutputBlockSize = blockSize;
+    }
 
-        public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset, int inputCount)
-        {
-            var o = new byte[inputCount];
-            TransformBlock(inputBuffer, inputOffset, inputCount, o, 0);
-            return o;
-        }
+    public int TransformBlock(byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer, int outputOffset)
+    {
+        if (inputCount != InputBlockSize && inputCount != 0)
+            throw new InvalidOperationException();
 
-        public bool CanReuseTransform => true;
-        public bool CanTransformMultipleBlocks => false;
-        public int InputBlockSize { get; }
-        public int OutputBlockSize { get; }
+        Array.Copy(inputBuffer, inputOffset, outputBuffer, outputOffset, inputCount);
+        return inputCount;
+    }
 
-        void IDisposable.Dispose()
-        { }
+    public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset, int inputCount)
+    {
+        var o = new byte[inputCount];
+        TransformBlock(inputBuffer, inputOffset, inputCount, o, 0);
+        return o;
+    }
 
-        [Fact]
-        public void MultipleBlocksThrows()
-        {
-            Assert.Equal(0, TransformBlock(Array.Empty<byte>(), 0, 0, Array.Empty<byte>(), 0));
-            var b = new byte[2 * InputBlockSize];
-            new Random().NextBytes(b);
-            Assert.Equal(InputBlockSize, TransformBlock(b, 0, InputBlockSize, b, InputBlockSize));
-            Assert.Equal(b.Take(InputBlockSize), b.Skip(InputBlockSize));
-            Assert.Throws<InvalidOperationException>(() => TransformFinalBlock(b, 0, b.Length));
-        }
+    public bool CanReuseTransform => true;
+    public bool CanTransformMultipleBlocks => false;
+    public int InputBlockSize { get; }
+    public int OutputBlockSize { get; }
+
+    void IDisposable.Dispose()
+    { }
+
+    [Fact]
+    public void MultipleBlocksThrows()
+    {
+        Assert.Equal(0, TransformBlock(Array.Empty<byte>(), 0, 0, Array.Empty<byte>(), 0));
+        var b = new byte[2 * InputBlockSize];
+        new Random().NextBytes(b);
+        Assert.Equal(InputBlockSize, TransformBlock(b, 0, InputBlockSize, b, InputBlockSize));
+        Assert.Equal(b.Take(InputBlockSize), b.Skip(InputBlockSize));
+        Assert.Throws<InvalidOperationException>(() => TransformFinalBlock(b, 0, b.Length));
     }
 }
