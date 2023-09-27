@@ -105,7 +105,7 @@ public class ZucReference
             Assert.Equal(tv, cipher2.NextKey());
         }
 
-        for (int i = 0; i < 5000; i++)
+        for (var i = 0; i < 5000; i++)
             Assert.Equal(cipher2.NextKey(), cipher1.NextKey());
     }
 
