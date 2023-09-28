@@ -14,9 +14,9 @@ public class Pkcs7PaddingReference
     [InlineData(new byte[] { 3, 2, 3, 4, 5, 6, 7 }, 8, new byte[] { 3, 2, 3, 4, 5, 6, 7, 1 })]
     public void Pkcs7PaddingVector(byte[] input, int blockSize, byte[] reference)
     {
-        var blkCipher = new NoOpSingleBlockTransform(blockSize);
-        var enc = new PaddingTransform(blkCipher, PaddingMode.PKCS7, false);
-        var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
+        using var blkCipher = new NoOpSingleBlockTransform(blockSize);
+        using var enc = new PaddingTransform(blkCipher, PaddingMode.PKCS7, false);
+        using var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
         var padded = enc.TransformFinalBlock(input, 0, input.Length);
         Assert.Equal(reference, padded);
 
@@ -42,8 +42,8 @@ public class Pkcs7PaddingReference
     [InlineData(new byte[] { 4, 2, 3, 4, 5, 6, 7, 7 }, 8)]
     public void InvalidPaddingThrows(byte[] error, int blockSize)
     {
-        var blkCipher = new NoOpTransform(blockSize);
-        var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
+        using var blkCipher = new NoOpTransform(blockSize);
+        using var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
         Assert.True(dec.CanReuseTransform);
         Assert.True(dec.CanTransformMultipleBlocks);
         Assert.Throws<CryptographicException>(() => dec.TransformFinalBlock(error, 0, error.Length));

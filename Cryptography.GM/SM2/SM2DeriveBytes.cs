@@ -1,25 +1,28 @@
 using Cryptography.GM.Primitives;
-using static Cryptography.GM.BitOps;
 // ReSharper disable InconsistentNaming
 
 namespace System.Security.Cryptography;
 
-public class SM2DeriveBytes : BlockDeriveBytes
+public sealed class SM2DeriveBytes : BlockDeriveBytes
 {
+    private readonly bool _disposeHash;
     private readonly HashAlgorithm _hasher;
     private readonly byte[] _key;
-    private uint _counter;
 
-    public SM2DeriveBytes(ReadOnlySpan<byte> key, HashAlgorithm? hash = null)
+    public SM2DeriveBytes(ReadOnlySpan<byte> key, HashAlgorithm? hash = null, bool disposeHash = false)
     {
         _key = new byte[key.Length + 4];
+        _disposeHash = disposeHash || hash == null;
         _hasher = hash ?? new SM3();
         key.CopyTo(_key);
     }
 
     public override void NextBlock(Span<byte> buf)
     {
-        WriteU32Be(_key.AsSpan(_key.Length - 4), ++_counter);
+        for (var i = 1; i <= 4; i++)
+            if (++_key[_key.Length - i] != 0)
+                break;
+
         _hasher.ComputeHash(_key).CopyTo(buf);
     }
 
@@ -28,12 +31,14 @@ public class SM2DeriveBytes : BlockDeriveBytes
     public override void Reset()
     {
         base.Reset();
-        _counter = 0;
+        Array.Clear(_key, _key.Length - 4, 4);
     }
 
     protected override void Dispose(bool disposing)
     {
+        base.Dispose(disposing);
         Array.Clear(_key, 0, _key.Length);
-        if (disposing) _hasher.Dispose();
+        if (disposing && _disposeHash)
+            _hasher.Dispose();
     }
 }

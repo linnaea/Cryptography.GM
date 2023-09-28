@@ -37,6 +37,13 @@ public abstract class EcbTransform : ICryptoTransform
         return output;
     }
 
-    public virtual void Dispose()
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~EcbTransform() => Dispose(false);
+    protected virtual void Dispose(bool disposing)
     { }
 }

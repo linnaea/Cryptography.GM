@@ -229,9 +229,8 @@ public sealed class ZucKeyStreamGenerator : BlockDeriveBytes
     public ZucKeyStreamGenerator(uint[] state)
     {
         Version = (ZucVersion)state[0];
-        if (!Enum.IsDefined(typeof(ZucVersion), Version)) {
+        if (!Enum.IsDefined(typeof(ZucVersion), Version))
             throw new InvalidOperationException();
-        }
 
         LoadState(state);
     }
@@ -273,4 +272,11 @@ public sealed class ZucKeyStreamGenerator : BlockDeriveBytes
     public override int BlockSize => 4;
     public override void NextBlock(Span<byte> buf) => WriteU32Be(buf, NextKey());
     public override void Reset() => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Array.Clear(_lfsr, 0, _lfsr.Length);
+        _fr1 = _fr2 = 0;
+    }
 }

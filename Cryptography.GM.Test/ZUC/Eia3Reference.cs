@@ -113,15 +113,19 @@ public class Eia3Reference
         k[24] ^= (byte)(direction << 7);
         k[30] ^= (byte)(direction << 7);
 
-        var hasher = new Eia3Mac(k);
-        hasher.HashBits(payload, bits);
-        Assert.Equal(mac, hasher.FinalizeHash());
+        using var hasher = new Eia3Mac(k);
+        var part1 = bits / 8 / 2;
+        hasher.TransformBlock(payload, 0, part1, null, 0);
+        hasher.HashBits(payload.AsSpan(part1), bits - part1 * 8);
+        hasher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
+
+        Assert.Equal(mac, BitOps.ReadU32Be(hasher.Hash));
         Assert.Equal(k, hasher.Key);
     }
 
     [Fact]
     public void BadKeyThrows()
     {
-        Assert.Throws<ArgumentException>(() => new Eia3Mac(Array.Empty<byte>()));
+        Assert.Throws<ArgumentException>(() => new Eia3Mac(EmptyArray<byte>.Instance));
     }
 }

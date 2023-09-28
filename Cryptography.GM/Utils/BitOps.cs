@@ -1,14 +1,16 @@
 using System;
 using System.Numerics;
+using Cryptography.GM.ECMath;
 
 // ReSharper disable once CheckNamespace
 namespace Cryptography.GM;
 
-public static class BitOps
+internal static class BitOps
 {
     public static uint RotL32(uint a, byte b) => (a << b) | (a >> (32 - b));
     public static uint MakeU32(byte hh, byte hl, byte lh, byte ll) => (uint)(hh << 24 | hl << 16 | lh << 8 | ll);
     public static uint ReadU32Be(ReadOnlySpan<byte> b) => MakeU32(b[0], b[1], b[2], b[3]);
+    public static ulong ReadU64Be(ReadOnlySpan<byte> b) => (ulong)MakeU32(b[0], b[1], b[2], b[3]) << 32 | MakeU32(b[4], b[5], b[6], b[7]);
 
     public static void WriteU16Be(Span<byte> b, ushort n)
     {
@@ -38,9 +40,24 @@ public static class BitOps
 
     public static ref T Back<T>(this T[] v, int n = 0) => ref v[v.Length - 1 - n];
 
+    public static void FillBytesUBe(this BigInteger x, Span<byte> target, int xBytes = -1)
+    {
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+        xBytes = xBytes < 0 ? x.GetByteCount(true) : xBytes;
+        var p = target.Length - xBytes;
+        target.Slice(0, p).Clear();
+        if (!x.TryWriteBytes(target.Slice(p), out var lenReal, true, true))
+            throw new Exception();
+        if (lenReal != xBytes)
+            throw new Exception();
+#else
+        x.ToByteArrayUBe(target.Length).CopyTo(target);
+#endif
+    }
+
     public static byte[] ToByteArrayUBe(this BigInteger x, int len = -1)
     {
-#if NETSTANDARD2_1
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
         var xb = x.ToByteArray(true, true);
         if (len < 0) return xb;
 
@@ -70,11 +87,15 @@ public static class BitOps
 
     public static BigInteger AsBigUIntBe(this byte[] x)
     {
-#if NETSTANDARD2_1
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
         return new BigInteger(x, true, true);
 #else
-        var b = new byte[x.Length + 1];
-        x.CopyTo(b, 1);
+        var b = x;
+        if ((x[0] & 0x80) != 0) {
+            b = new byte[x.Length + 1];
+            x.CopyTo(b, 1);
+        }
+
         Array.Reverse(b);
         var r = new BigInteger(b);
         return r;
@@ -83,7 +104,7 @@ public static class BitOps
 
     public static BigInteger AsBigUIntBe(this ReadOnlySpan<byte> x)
     {
-#if NETSTANDARD2_1
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
         return new BigInteger(x, true, true);
 #else
         var b = new byte[x.Length + 1];
@@ -116,10 +137,18 @@ public static class BitOps
         return t;
     }
 
-    public static int BitLength(this BigInteger v)
+#if !NET5_0_OR_GREATER
+    public static uint GetBitLength(this BigInteger v)
     {
+#if NETSTANDARD2_1_OR_GREATER
+        var bits = v.GetByteCount();
+        var b = bits < 72 ? stackalloc byte[bits] : new byte[bits];
+        v.TryWriteBytes(b, out bits);
+        bits *= 8;
+#else
         var b = v.ToByteArray();
         var bits = b.Length * 8;
+#endif
         while (b[bits / 8 - 1] == 0)
             bits -= 8;
 
@@ -130,8 +159,9 @@ public static class BitOps
             bits -= 1;
         }
 
-        return bits + 1;
+        return (uint)bits + 1;
     }
+#endif
 
     public static bool SequenceEquals(this ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
@@ -195,4 +225,7 @@ public static class BitOps
         src.Slice(0, remainingBytes).CopyTo(dst.Slice(0, remainingBytes));
         return SliceBits(src, bitLength);
     }
+
+    public static int SerializedLength(this EcPointFormat pointFormat, int elementLength)
+        => 1 + elementLength * (pointFormat == EcPointFormat.Compressed ? 1 : 2);
 }

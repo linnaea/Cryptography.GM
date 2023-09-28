@@ -1,6 +1,5 @@
 // ReSharper disable once RedundantUsingDirective
 using System;
-using System.Linq;
 using System.Security.Cryptography;
 using Xunit;
 
@@ -79,7 +78,7 @@ public class Sm3Reference
     })]
     public void Sm3Vector(byte[] hash, byte[] data)
     {
-        var hasher = new System.Security.Cryptography.SM3();
+        using var hasher = new System.Security.Cryptography.SM3();
         var rng = new Random();
         var offset = 0;
         while (offset < data.Length) {
@@ -88,7 +87,7 @@ public class Sm3Reference
             offset += len;
         }
 
-        hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        hasher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
         Assert.Equal(hash, hasher.Hash);
     }
 
@@ -137,6 +136,7 @@ public class Sm3Reference
     })]
     public void HmacSm3Vector(byte[] hash, byte[] hmacKey, byte[] data)
     {
-        Assert.Equal(hash, new HMACSM3(hmacKey).ComputeHash(data));
+        using var hasher = new HMACSM3(hmacKey);
+        Assert.Equal(hash, hasher.ComputeHash(data));
     }
 }

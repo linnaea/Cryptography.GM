@@ -21,12 +21,13 @@ public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : Deri
         if (_w == null)
             throw new InvalidOperationException();
 
-        Span<byte> next = stackalloc byte[Rng is BlockDeriveBytes bdb ? bdb.BlockSize : 64];
+        var bdb = Rng as BlockDeriveBytes;
+        Span<byte> next = stackalloc byte[bdb?.BlockSize ?? 0];
         while (_iPos >= _w.Length - 2) {
-            if (Rng is BlockDeriveBytes bdb1) {
-                bdb1.NextBlock(next);
+            if (bdb != null) {
+                bdb.NextBlock(next);
             } else {
-                Rng.GetBytes(next.Length).CopyTo(next);
+                next = Rng.GetBytes(64);
             }
 
             var newBuf = new byte[_w.Length - _iPos + next.Length];
@@ -92,6 +93,7 @@ public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : Deri
         TransformBlock(inputBuffer, inputOffset, inputCount, buf, 0);
         if (CanReuseTransform) {
             ResetRng();
+            Array.Clear(_w, 0, _w.Length);
             _w = EmptyArray<byte>.Instance;
             _iPos = _bPos = 0;
         } else {
@@ -110,7 +112,18 @@ public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : Deri
 
     public void Dispose()
     {
-        _w = null!;
-        Rng.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~XorStreamCipherTransform() => Dispose(false);
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing) Rng.Dispose();
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        if (_w != null) {
+            Array.Clear(_w, 0, _w.Length);
+            _w = null!;
+        }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Security.Cryptography;
 
 // ReSharper disable once CheckNamespace
@@ -7,39 +6,35 @@ namespace Cryptography.GM.Primitives;
 
 public abstract class BlockDeriveBytes : DeriveBytes
 {
-    private byte[] _remaining = EmptyArray<byte>.Instance;
+    private byte[] _buf = EmptyArray<byte>.Instance;
+    private int _bufPos;
 
     public abstract int BlockSize { get; }
     public abstract void NextBlock(Span<byte> buf);
 
-    public void GetBytes(byte[] buf)
+    public void GetBytes(Span<byte> buf)
     {
-        var cb = buf.Length;
-        if (cb < _remaining.Length) {
-            Array.Copy(_remaining, 0, buf, 0, cb);
-            Array.Copy(_remaining, cb, _remaining, 0, _remaining.Length - cb);
-            Array.Resize(ref _remaining, _remaining.Length - cb);
-            return;
-        }
+        if (_buf.Length == 0)
+            _buf = new byte[_bufPos = BlockSize];
 
-        Array.Copy(_remaining, buf, _remaining.Length);
-        var offset = _remaining.Length;
-        _remaining = EmptyArray<byte>.Instance;
-
-        while (offset < cb) {
-            var toCopy = Math.Min(cb - offset, BlockSize);
-            if (toCopy == BlockSize) {
-                NextBlock(buf.AsSpan(offset));
-            } else {
-                var bounce = ArrayPool<byte>.Shared.Rent(BlockSize);
-                _remaining = new byte[BlockSize - toCopy];
-                NextBlock(bounce.AsSpan(0, BlockSize));
-                Array.Copy(bounce, 0, buf, offset, toCopy);
-                Array.Copy(bounce, toCopy, _remaining, 0, _remaining.Length);
-                ArrayPool<byte>.Shared.Return(bounce);
+        while (!buf.IsEmpty) {
+            var cb = buf.Length;
+            if (cb + _bufPos <= _buf.Length) {
+                _buf.AsSpan(_bufPos, cb).CopyTo(buf);
+                _bufPos += cb;
+                return;
             }
 
-            offset += toCopy;
+            _buf.AsSpan(_bufPos).CopyTo(buf);
+            buf = buf.Slice(_buf.Length - _bufPos);
+
+            while (buf.Length >= BlockSize) {
+                NextBlock(buf.Slice(0, BlockSize));
+                buf = buf.Slice(BlockSize);
+            }
+
+            NextBlock(_buf);
+            _bufPos = 0;
         }
     }
 
@@ -52,6 +47,13 @@ public abstract class BlockDeriveBytes : DeriveBytes
 
     public override void Reset()
     {
-        _remaining = EmptyArray<byte>.Instance;
+        _bufPos = _buf.Length;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Array.Clear(_buf, 0, _buf.Length);
+        _buf = null!;
     }
 }

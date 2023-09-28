@@ -20,8 +20,7 @@ public sealed class PaddingTransform : ICryptoTransform
         if (mode != PaddingMode.ISO10126 && mode != PaddingMode.ANSIX923 && mode != PaddingMode.PKCS7)
             throw new NotSupportedException();
 
-        if (blkCipher.InputBlockSize > byte.MaxValue || blkCipher.OutputBlockSize > byte.MaxValue ||
-            blkCipher.InputBlockSize == 0 || blkCipher.OutputBlockSize == 0)
+        if (blkCipher.InputBlockSize is > byte.MaxValue or < 2 || blkCipher.OutputBlockSize is > byte.MaxValue or < 2)
             throw new CryptographicException("Padding can only be used with block ciphers with block size of [2,255]");
 
         _lastBlock = new byte[decrypt ? InputBlockSize : OutputBlockSize];
@@ -114,5 +113,17 @@ public sealed class PaddingTransform : ICryptoTransform
     public bool CanTransformMultipleBlocks => _blkCipher.CanTransformMultipleBlocks;
     public int InputBlockSize => _blkCipher.InputBlockSize;
     public int OutputBlockSize => _blkCipher.OutputBlockSize;
-    public void Dispose() => _blkCipher.Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~PaddingTransform() => Dispose(false);
+    private void Dispose(bool disposing)
+    {
+        Array.Clear(_lastBlock, 0, _lastBlock.Length);
+        if (disposing) _blkCipher.Dispose();
+    }
 }

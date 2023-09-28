@@ -23,7 +23,7 @@ public class SM2SignatureReference
     public void SignatureVector()
     {
         var k = (BigInteger.Parse("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21",
-                                  NumberStyles.HexNumber) - 1).ToByteArray();
+                                  NumberStyles.HexNumber) - BigInteger.Pow(2, 176)).ToByteArray();
         var d = BigInteger.Parse("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8",
                                  NumberStyles.HexNumber);
         var q = new byte[] {
@@ -42,11 +42,11 @@ public class SM2SignatureReference
         };
 
         Array.Resize(ref k, k.Length + 13);
-        var rng = new FixedBytesGenerator(k);
-        var sm2 = System.Security.Cryptography.SM2.Create(rng);
+        using var rng = new FixedBytesGenerator(k);
+        using var sm2 = System.Security.Cryptography.SM2.Create(rng);
         sm2.Ident = id;
         sm2.ImportPrivateKey(d);
-        Assert.Equal(q, sm2.ExportKey().Q.ToBytes(sm2, EcPointFormat.Compressed));
+        Assert.Equal(q, sm2.ExportKey().Q.ToBytes(sm2.KeySize, EcPointFormat.Compressed));
 
         sm2.ImportPublicKey(sm2.PointFromBytes(q).Point);
         Assert.Equal(d, sm2.ExportKey().D);

@@ -65,14 +65,14 @@ public class ZucReference
         })]
     public void Zuc256EVector(byte[] sk, byte[] iv, uint[] seq)
     {
-        var cipher = new ZucKeyStreamGenerator(sk, iv, ZucVersion.Zuc256E);
+        using var cipher = new ZucKeyStreamGenerator(sk, iv, ZucVersion.Zuc256E);
         Assert.Equal(seq, cipher.EnumerateKeys().Take(seq.Length));
     }
 
     [Fact]
     public void Zuc15Vector4()
     {
-        var cipher = Zuc15TestVector2(
+        using var cipher = Zuc15TestVector2(
             new byte[] { 0x4D, 0x32, 0x0B, 0xFA, 0xD4, 0xC2, 0x85, 0xBF, 0xD6, 0xB8, 0xBD, 0x00, 0xF3, 0x9D, 0x8B, 0x41 },
             new byte[] { 0x52, 0x95, 0x9D, 0xAB, 0xA0, 0xBF, 0x17, 0x6E, 0xCE, 0x2D, 0xC3, 0x15, 0x04, 0x9E, 0xB5, 0x74 },
             0xED4400E7u, 0x0633E5C5u);
@@ -98,8 +98,8 @@ public class ZucReference
         })]
     public void Zuc14WeakKeyIvCollision(byte[] sk, byte[] iv1, byte[] iv2, uint[] keyStream)
     {
-        var cipher1 = new ZucKeyStreamGenerator(sk, iv1, ZucVersion.Zuc14);
-        var cipher2 = new ZucKeyStreamGenerator(sk, iv2, ZucVersion.Zuc14);
+        using var cipher1 = new ZucKeyStreamGenerator(sk, iv1, ZucVersion.Zuc14);
+        using var cipher2 = new ZucKeyStreamGenerator(sk, iv2, ZucVersion.Zuc14);
         foreach (var tv in keyStream) {
             Assert.Equal(tv, cipher1.NextKey());
             Assert.Equal(tv, cipher2.NextKey());
@@ -117,10 +117,11 @@ public class ZucReference
     [InlineData(ZucVersion.Zuc256M128)]
     public void CrossLoadStateThrows(ZucVersion v)
     {
-        var st14 = new ZucKeyStreamGenerator(new byte[32], new byte[23], ZucVersion.Zuc14);
-        var stTest = new ZucKeyStreamGenerator(new byte[32], new byte[23], v);
+        using var st14 = new ZucKeyStreamGenerator(new byte[32], new byte[23], ZucVersion.Zuc14);
+        using var stTest = new ZucKeyStreamGenerator(new byte[32], new byte[23], v);
         Assert.Throws<InvalidOperationException>(() => stTest.LoadState(st14.DumpState()));
         Assert.Throws<InvalidOperationException>(() => st14.LoadState(stTest.DumpState()));
+        Assert.Throws<NotSupportedException>(() => stTest.Reset());
     }
 
     [Fact]
@@ -141,6 +142,6 @@ public class ZucReference
         badState[0] = (uint)ZucVersion.Zuc15;
         Assert.Throws<ArgumentException>(() => new ZucKeyStreamGenerator(new byte[32], badIv, ZucVersion.Zuc256E));
         Assert.Throws<InvalidOperationException>(() => new ZucKeyStreamGenerator(badState));
-        Assert.Throws<IndexOutOfRangeException>(() => new ZucKeyStreamGenerator(Array.Empty<byte>(), Array.Empty<byte>()));
+        Assert.Throws<IndexOutOfRangeException>(() => new ZucKeyStreamGenerator(EmptyArray<byte>.Instance, EmptyArray<byte>.Instance));
     }
 }

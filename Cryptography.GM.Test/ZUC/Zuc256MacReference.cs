@@ -46,22 +46,21 @@ public class Zuc256MacReference
         for (var i = 0; i < msg.Length; i++) msg[i] = msgUni;
         sk.CopyTo(macKey, 0);
         iv.CopyTo(macKey, 32);
-        var m32 = new Zuc256Mac32(macKey);
-        var m64 = new Zuc256Mac64(macKey);
-        var m128 = new Zuc256Mac128(macKey);
-
-        m64.HashBits(msg, msgLenBytes * 8);
-        m128.HashBits(msg, msgLenBytes * 8);
-
+        using var m32 = new Zuc256Mac32(macKey);
+        using var m64 = new Zuc256Mac64(macKey);
         Assert.Equal(mac32, BitOps.ReadU32Be(m32.ComputeHash(msg)));
-        Assert.Equal(mac64, m64.FinalizeHash());
-        Assert.Equal(mac128, m128.FinalizeHashBytes());
+        Assert.Equal(mac64, BitOps.ReadU64Be(m64.ComputeHash(msg)));
+
+        using var m128 = new Zuc256Mac128(macKey);
+        m128.HashBits(msg, msgLenBytes * 8);
+        m128.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
+        Assert.Equal(mac128, m128.Hash);
         Assert.Equal(macKey, m32.Key);
     }
 
     [Fact]
     public void BadKeyThrows()
     {
-        Assert.Throws<ArgumentException>(() => new Zuc256Mac32(Array.Empty<byte>()));
+        Assert.Throws<ArgumentException>(() => new Zuc256Mac32(EmptyArray<byte>.Instance));
     }
 }

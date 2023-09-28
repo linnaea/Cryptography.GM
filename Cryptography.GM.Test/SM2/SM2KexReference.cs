@@ -17,9 +17,9 @@ public class SM2KexReference
         var db = BigInteger.Parse("0785129917D45A9EA5437A59356B82338EAADDA6CEB199088F14AE10DEFA229B5",
                                   NumberStyles.HexNumber);
         var ra = (BigInteger.Parse("0D4DE15474DB74D06491C440D305E012400990F3E390C7E87153C12DB2EA60BB3",
-                                   NumberStyles.HexNumber) - 1).ToByteArray();
-        var rb = (BigInteger.Parse("07E07124814B309489125EAED101113164EBF0F3458C5BD88335C1F9D596243D6",
-                                   NumberStyles.HexNumber) - 1).ToByteArray();
+                                   NumberStyles.HexNumber) - BigInteger.Pow(2, 176)).ToByteArray();
+        var rb = BigInteger.Parse("07E07124814B309489125EAED101113164EBF0F3458C5BD88335C1F9D596243D6",
+                                   NumberStyles.HexNumber);
         var id = Encoding.ASCII.GetBytes("1234567812345678");
         var sa = new byte[] {
             0x18, 0xC7, 0x89, 0x4B, 0x38, 0x16, 0xDF, 0x16, 0xCF, 0x07, 0xB0, 0x5C, 0x5E, 0xC0, 0xBE, 0xF5,
@@ -34,33 +34,41 @@ public class SM2KexReference
         };
 
         Array.Resize(ref ra, ra.Length + 13);
-        Array.Resize(ref rb, rb.Length + 13);
-        var rngA = new FixedBytesGenerator(ra);
-        var rngB = new FixedBytesGenerator(rb);
-        var a = System.Security.Cryptography.SM2.Create(rngA);
-        var b = System.Security.Cryptography.SM2.Create(rngB);
+        using var rngA = new FixedBytesGenerator(ra);
+        using var a = System.Security.Cryptography.SM2.Create(rngA);
+        using var b = System.Security.Cryptography.SM2.Create();
         a.ImportPrivateKey(da);
         b.ImportPrivateKey(db);
         a.Ident = id;
         b.Ident = id;
 
         rngA.Reset();
-        rngB.Reset();
-        var keA = a.StartKeyExchange(false);
-        var keB = b.StartKeyExchange(true);
+        using var keA = a.StartKeyExchange(false);
+        using var keB = b.ContinueKeyExchange(rb, true);
 
         var (kdfA, s1a, s2a) = keA.DeriveKey(b.ExportKey().Q, keB.R, id);
         var (kdfB, s1b, s2b) = keB.DeriveKey(a.ExportKey().Q, keA.R, id);
+        using(kdfA) using(kdfB)
+        {
+            Assert.NotNull(kdfA);
+            Assert.NotNull(kdfB);
+            Assert.Equal(sa, s1a);
+            Assert.Equal(sa, s2b);
+            Assert.Equal(sb, s1b);
+            Assert.Equal(sb, s2a);
+            for(var i = 0; i < 256; i++) {
+                var ka = kdfA.GetBytes(40);
+                var kb1 = kdfB.GetBytes(40 - i % 40);
+                var kb2 = kdfB.GetBytes(i % 40);
+                Array.Resize(ref kb1, 40);
+                Array.Copy(kb2, 0, kb1, kb1.Length - kb2.Length, kb2.Length);
+                Assert.Equal(ka, kb1);
+            }
 
-        Assert.NotNull(kdfA);
-        Assert.NotNull(kdfB);
-        Assert.Equal(sa, s1a);
-        Assert.Equal(sa, s2b);
-        Assert.Equal(sb, s1b);
-        Assert.Equal(sb, s2a);
-
-        Assert.Equal(k, kdfA.GetBytes(k.Length));
-        Assert.Equal(k, kdfB.GetBytes(k.Length));
-        Assert.Equal(kdfA.GetBytes(32), kdfB.GetBytes(32));
+            kdfA.Reset();
+            kdfB.Reset();
+            Assert.Equal(k, kdfA.GetBytes(k.Length));
+            Assert.Equal(k, kdfB.GetBytes(k.Length));
+        }
     }
 }

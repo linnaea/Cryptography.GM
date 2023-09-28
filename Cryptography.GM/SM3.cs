@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Cryptography.GM.Primitives;
 using Cryptography.GM;
 using static Cryptography.GM.BitOps;
@@ -8,7 +9,6 @@ namespace System.Security.Cryptography;
 
 public sealed class SM3 : HashAlgorithm
 {
-    public override int HashSize => 256;
     public const ushort BlockSize = 512;
 
     private readonly byte[] _msgBuf = new byte[BlockSize / 8];
@@ -19,6 +19,7 @@ public sealed class SM3 : HashAlgorithm
 
     public SM3()
     {
+        HashSizeValue = 256;
         Initialize();
     }
 
@@ -61,7 +62,7 @@ public sealed class SM3 : HashAlgorithm
             e = P0(tt2);
         }
 
-        _state = (a, b, c, d, e, f, g, h) ^ _state;
+        _state = new Bits256(a, b, c, d, e, f, g, h) ^ _state;
     }
 
     private ReadOnlySpan<byte> CopyToBuffer(ReadOnlySpan<byte> buf, ref ulong nBits)
@@ -89,16 +90,28 @@ public sealed class SM3 : HashAlgorithm
         }
     }
 
-#if NETSTANDARD2_1
-    protected override void HashCore(ReadOnlySpan<byte> buf) => HashCoreBits(buf, (uint)buf.Length * 8);
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    protected override void HashCore(ReadOnlySpan<byte> buf)
 #else
-    private void HashCore(ReadOnlySpan<byte> buf) => HashCoreBits(buf, (uint)buf.Length * 8);
+    private void HashCore(ReadOnlySpan<byte> buf)
+#endif
+        => HashCoreBits(buf, (uint)buf.Length * 8);
+
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    protected override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
+    {
+        bytesWritten = FinalizeHash(destination);
+        return true;
+    }
 #endif
 
-    public byte[] FinalizeHash()
+    public int FinalizeHash(Span<byte> destination)
     {
+        if (destination.Length < 32)
+            throw new InvalidOperationException();
+
         var messageBits = _blockCount * BlockSize + _msgBufCount;
-        HashCoreBits(new byte[] { 0x80 }, 1);
+        HashCoreBits(new byte[] { 0x80 }, 8 - (messageBits & 7));
         byte[] finalBlock;
         uint finalBlockOffset;
         if (_msgBufCount > BlockSize - 64) {
@@ -112,22 +125,27 @@ public sealed class SM3 : HashAlgorithm
         WriteU64Be(finalBlock.AsSpan(finalBlock.Length - 8), messageBits);
         HashCoreBits(finalBlock.SliceBits(finalBlockOffset), (uint)finalBlock.Length * 8 - finalBlockOffset);
 
-        var r = new byte[32];
-        for (var i = 0; i < 32; i++) {
-            r[i] = (byte)(Bits128)(_state >> (248 - i * 8));
-        }
-
-        return r;
+        var (ul0, ul1, ul2, ul3) = _state;
+        WriteU64Be(destination.Slice(0, 8), ul0);
+        WriteU64Be(destination.Slice(8, 8), ul1);
+        WriteU64Be(destination.Slice(16, 8), ul2);
+        WriteU64Be(destination.Slice(24, 8), ul3);
+        return 32;
     }
 
-    protected override byte[] HashFinal() => FinalizeHash();
+    protected override byte[] HashFinal()
+    {
+        var r = new byte[32];
+        FinalizeHash(r);
+        return r;
+    }
 
     protected override void HashCore(byte[] array, int ibStart, int cbSize)
         => HashCore(array.AsSpan(ibStart, cbSize));
 
     public override void Initialize()
     {
-        _state = (0x7380166fu, 0x4914b2b9u, 0x172442d7u, 0xda8a0600u, 0xa96f30bcu, 0x163138aau, 0xe38dee4du, 0xb0fb0e4e);
+        _state = new Bits256(0x7380166fu, 0x4914b2b9u, 0x172442d7u, 0xda8a0600u, 0xa96f30bcu, 0x163138aau, 0xe38dee4du, 0xb0fb0e4e);
         _blockCount = 0;
         _msgBufCount = 0;
     }
@@ -139,7 +157,8 @@ public sealed class HMACSM3 : GenericHMAC<SM3>
     public HMACSM3(byte[] rgbKey) : base(new SM3(), SM3.BlockSize / 8, rgbKey)
     { }
 
-    protected override byte[] FinalizeInnerHash() => Hasher.FinalizeHash();
+    protected override int FinalizeInnerHash(Span<byte> hashValueBuf)
+        => Hasher.FinalizeHash(hashValueBuf);
 
     protected override void AddHashData(byte[] rgb, int ib, int cb)
         => Hasher.HashCoreBits(rgb.AsSpan(ib, cb), (uint)cb * 8);

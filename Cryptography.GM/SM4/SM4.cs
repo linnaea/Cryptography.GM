@@ -14,13 +14,15 @@ public sealed class SM4 : SymmetricAlgorithm
         KeySizeValue = BlockSizeValue = 128;
     }
 
-    private ICryptoTransform CreateXfrm(byte[] rgbKey, byte[] rgbIV, bool decrypt)
+    private ICryptoTransform CreateXfrm(byte[] rgbKey, byte[]? rgbIV, bool decrypt)
     {
         ICryptoTransform xfrm = new SM4Transform(rgbKey, decrypt);
         switch (Mode) {
         case CipherMode.ECB:
             break;
         case CipherMode.CBC:
+            if (rgbIV == null)
+                throw new ArgumentNullException(nameof(rgbIV));
             xfrm = new CbcTransform(xfrm, rgbIV, decrypt);
             break;
         default:
@@ -45,23 +47,25 @@ public sealed class SM4 : SymmetricAlgorithm
         return xfrm;
     }
 
-    public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[] rgbIV)
+    public override ICryptoTransform CreateDecryptor(byte[] rgbKey, byte[]? rgbIV)
         => CreateXfrm(rgbKey, rgbIV, true);
 
-    public override ICryptoTransform CreateEncryptor(byte[] rgbKey, byte[] rgbIV)
+    public override ICryptoTransform CreateEncryptor(byte[] rgbKey, byte[]? rgbIV)
         => CreateXfrm(rgbKey, rgbIV, false);
 
     public override void GenerateIV()
     {
         var iv = new byte[16];
-        RandomNumberGenerator.Create().GetBytes(iv);
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(iv);
         IVValue = iv;
     }
 
     public override void GenerateKey()
     {
         var k = new byte[16];
-        RandomNumberGenerator.Create().GetBytes(k);
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(k);
         KeyValue = k;
     }
 }

@@ -1,16 +1,24 @@
-using System;
 using System.Numerics;
 // ReSharper disable InconsistentNaming
 // ReSharper disable once CheckNamespace
 
 namespace Cryptography.GM.ECMath;
 
-public static class NAF
+internal static class NAF
 {
-    public static byte[] ToNAFBytes(this BigInteger x)
+    public static int ToNAFBytes(this BigInteger x, ref byte[]? naf)
     {
-        var xb = x.ToByteArray();
-        var naf = new byte[xb.Length * 4 + 1];
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+        var len = x.GetByteCount(true);
+#else
+        var len = x.ToByteArray().Length;
+#endif
+
+        len = len * 4 + 1;
+        naf ??= new byte[len];
+        if (naf.Length < len)
+            naf = new byte[len];
+
         var i = 0;
         while (!x.IsZero) {
             var k = 0;
@@ -20,13 +28,15 @@ public static class NAF
 
             var nibble = (byte)(k & 0xF);
             nibble <<= (i & 1) << 2;
-            naf[i / 2] |= nibble;
+            if((i & 1) == 0)
+                naf[i / 2] = nibble;
+            else
+                naf[i / 2] |= nibble;
             x = (x - k) / 2;
             i++;
         }
 
-        Array.Resize(ref naf, (i + 1) / 2);
-        return naf;
+        return (i + 1) / 2;
     }
 
     public static sbyte H(this byte b) => (sbyte)((sbyte)b >> 4);

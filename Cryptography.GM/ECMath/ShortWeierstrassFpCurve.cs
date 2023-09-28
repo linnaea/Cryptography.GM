@@ -2,34 +2,36 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
-using System.Security.Cryptography;
 using Cryptography.GM.Primitives;
+// ReSharper disable once RedundantUsingDirective
+using System.Security.Cryptography;
 
 // ReSharper disable once CheckNamespace
 namespace Cryptography.GM.ECMath;
 
-public class FpParameter : IEcParameter
+public class ShortWeierstrassFpParameter : IEcParameter
 {
     public EcPoint G { get; }
-    public FpCurve Curve { get; }
+    public ShortWeierstrassFpCurve Curve { get; }
     public ushort BitLength { get; }
     public BigInteger H => BigInteger.One;
     public BigInteger N { get; }
 
-    public FpParameter(FpCurve curve, EcPoint g, BigInteger n)
+    public ShortWeierstrassFpParameter(ShortWeierstrassFpCurve curve, EcPoint g, BigInteger n)
     {
         Curve = curve;
         G = g;
         N = n;
-        BitLength = (ushort)n.BitLength();
+        BitLength = (ushort)n.GetBitLength();
+        if (n.IsPowerOfTwo) BitLength--;
     }
 
     IEcCurve IEcParameter.Curve => Curve;
 
-#if NETSTANDARD
+#if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     ECCurve IEcParameter.ToEcCurve() => this;
 
-    public static implicit operator ECCurve(FpParameter p) =>
+    public static implicit operator ECCurve(ShortWeierstrassFpParameter p) =>
         new() {
             CurveType = ECCurve.ECCurveType.PrimeShortWeierstrass,
             Prime = p.Curve.P.ToByteArrayUBe(),
@@ -40,31 +42,13 @@ public class FpParameter : IEcParameter
             Order = p.N.ToByteArrayUBe()
         };
 #endif
-
-    // ReSharper disable once InconsistentNaming
-    [SuppressMessage("ReSharper", "StringLiteralTypo")]
-    public static readonly FpParameter SM2StandardParam = new(
-        new FpCurve(
-            BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF",
-                             NumberStyles.HexNumber),
-            BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC",
-                             NumberStyles.HexNumber),
-            BigInteger.Parse("028E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93",
-                             NumberStyles.HexNumber)
-        ),
-        new EcPoint(
-            BigInteger.Parse("032C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7",
-                             NumberStyles.HexNumber),
-            BigInteger.Parse("0BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0",
-                             NumberStyles.HexNumber)
-        ),
-        BigInteger.Parse("0FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123",
-                         NumberStyles.HexNumber)
-    );
 }
 
-public class FpCurve : IEcCurve
+public class ShortWeierstrassFpCurve : IEcCurve
 {
+    [ThreadStatic] private static byte[]? _naf1;
+    [ThreadStatic] private static byte[]? _naf2;
+
     private readonly BigInteger _inv2;
     private readonly BigInteger _eulerPower;
 
@@ -73,12 +57,12 @@ public class FpCurve : IEcCurve
     public BigInteger B { get; }
     public ushort BitLength { get; }
 
-    public FpCurve(BigInteger p, BigInteger a, BigInteger b)
+    public ShortWeierstrassFpCurve(BigInteger p, BigInteger a, BigInteger b)
     {
         P = p;
         A = a;
         B = b;
-        BitLength = (ushort)p.BitLength();
+        BitLength = (ushort)p.GetBitLength();
         _eulerPower = (p - 1) / 2;
         _inv2 = 2;
         _inv2 = _inv2.InvMod(p);
@@ -129,14 +113,14 @@ public class FpCurve : IEcCurve
             var b = BigInteger.ModPow(c, BigInteger.ModPow(2, m - i - 1, P), P);
             m = i;
             c = b * b % P;
-            t = t * b * b % P;
+            t = t * c % P;
             r = r * b % P;
         }
     }
 
     public BigInteger SolveY(BigInteger x, bool lsbSet, AnyRng rng)
     {
-        var rhs = x * x * x + A * x + B;
+        var rhs = BigInteger.ModPow(x, 3, P) + A * x + B;
         rhs %= P;
         var r = Sqrt(rhs, rng);
 
@@ -165,9 +149,7 @@ public class FpCurve : IEcCurve
 
     private JacobianEcPoint Negate(JacobianEcPoint p)
     {
-        if (p.Inf) return p;
-        if (p.Y.IsZero) return p;
-
+        if (p.Inf || p.Y.IsZero) return p;
         return p with { Y = P - p.Y };
     }
 
@@ -176,10 +158,12 @@ public class FpCurve : IEcCurve
         if (p1.Inf) return p2;
         if (p2.Inf) return p1;
 
-        var a = p1.X * p2.Z * p2.Z % P;
-        var b = p2.X * p1.Z * p1.Z % P;
-        var c = p1.Y * p2.Z * p2.Z * p2.Z % P;
-        var d = p2.Y * p1.Z * p1.Z * p1.Z % P;
+        var zz2 = BigInteger.ModPow(p2.Z, 2, P);
+        var zz1 = BigInteger.ModPow(p1.Z, 2, P);
+        var a = p1.X * zz2 % P;
+        var b = p2.X * zz1 % P;
+        var c = p1.Y * zz2 * p2.Z % P;
+        var d = p2.Y * zz1 * p1.Z % P;
         var e = a - b;
         var f = c - d;
 
@@ -187,8 +171,11 @@ public class FpCurve : IEcCurve
             return f.IsZero ? Double(p1) : JacobianEcPoint.Infinity;
         }
 
-        var x = f * f - e * e * e - 2 * b * e * e;
-        var y = f * (b * e * e - x) - d * e * e * e;
+        var ee = e * e;
+        var bee = b * ee;
+        var eee = e * ee;
+        var x = f * f - eee - 2 * bee;
+        var y = f * (bee - x) - d * eee;
         var z = p1.Z * p2.Z * e;
         x -= (x / P - (x.Sign < 0 ? 1 : 0)) * P;
         y -= (y / P - (y.Sign < 0 ? 1 : 0)) * P;
@@ -198,15 +185,17 @@ public class FpCurve : IEcCurve
         };
     }
 
-    private static (byte[], byte[]) ToNafBytes(BigInteger i1, BigInteger i2)
+    private static int ToNafBytes(BigInteger i1, BigInteger i2)
     {
-        var k1 = i1.ToNAFBytes();
-        var k2 = i2.ToNAFBytes();
-        var kl = Math.Max(k1.Length, k2.Length);
-        Array.Resize(ref k1, kl);
-        Array.Resize(ref k2, kl);
+        var k1 = i1.ToNAFBytes(ref _naf1);
+        var k2 = i2.ToNAFBytes(ref _naf2);
+        var kl = Math.Max(k1, k2);
+        if (_naf1!.Length < kl) Array.Resize(ref _naf1, kl);
+        if (_naf2!.Length < kl) Array.Resize(ref _naf2, kl);
+        if (kl != k1) Array.Clear(_naf1!, k1, kl - k1);
+        if (kl != k2) Array.Clear(_naf2!, k2, kl - k2);
 
-        return (k1, k2);
+        return kl;
     }
 
     public JacobianEcPoint MultiplyAndAdd(BigInteger k, JacobianEcPoint p, BigInteger m, JacobianEcPoint s, AnyRng rng)
@@ -226,9 +215,11 @@ public class FpCurve : IEcCurve
         if (k.IsOne) return Add(p, Multiply(m, s, rng));
         if (m.IsOne) return Add(s, Multiply(k, p, rng));
 
-        var (kk, mm) = ToNafBytes(k, m);
+        var nafBytes = ToNafBytes(k, m) - 1;
+        var kk = _naf1!;
+        var mm = _naf2!;
         var i = 0;
-        while (i < kk.Length - 1) {
+        while (i < nafBytes) {
             if (kk[i] != 0 || mm[i] != 0) {
                 i++;
                 continue;
@@ -268,8 +259,8 @@ public class FpCurve : IEcCurve
             Double(p), Add(Double(p), s), Add(Double(p), Double(s))
         };
 
-        var r = lut[kk.Back().NafValue() * 7 + mm.Back().NafValue() - 1];
-        for (i = kk.Length - 2; i >= 0; i--) {
+        var r = lut[kk[nafBytes].NafValue() * 7 + mm[nafBytes].NafValue() - 1];
+        for (i = nafBytes - 1; i >= 0; i--) {
             r = Double(Double(r));
             if (kk[i] == 0) {
                 if (mm[i].NafValue() < 0) {
@@ -298,10 +289,11 @@ public class FpCurve : IEcCurve
         if (k.IsOne) return p;
 
         var ks = rng.NextBigInt(BigInteger.One, k);
-        // return MultiplyAndAdd(ks, p, k - ks, p, rng);
-        var (k1, k2) = ToNafBytes(k - ks, ks);
+        var nafBytes = ToNafBytes(k - ks, ks) - 1;
+        var k1 = _naf1!;
+        var k2 = _naf2!;
         var i = 0;
-        while (i < k1.Length - 1) {
+        while (i < nafBytes) {
             var c = k1[i].NafValue() + k2[i].NafValue();
             if (c != 0) {
                 i++;
@@ -325,8 +317,8 @@ public class FpCurve : IEcCurve
             Double(Double(p))
         };
 
-        var r = lut[k1.Back().NafValue() + k2.Back().NafValue()];
-        for (i = k1.Length - 2; i >= 0; i--) {
+        var r = lut[k1[nafBytes].NafValue() + k2[nafBytes].NafValue()];
+        for (i = nafBytes - 1; i >= 0; i--) {
             var c = k1[i].NafValue() + k2[i].NafValue();
             r = Add(Double(Double(r)), c < 0 ? Negate(lut[-c]) : lut[c]);
         }
@@ -336,23 +328,18 @@ public class FpCurve : IEcCurve
 
     public EcPoint ToAffine(JacobianEcPoint jp)
     {
-        if (jp.Inf)
-            return EcPoint.Infinity;
-        if (jp.Affine)
-            return new EcPoint(jp.X, jp.Y);
-        BigInteger x, y;
-        var zc = (jp.Z * jp.Z % P).InvMod(P);
-        var zd = (jp.Z * jp.Z * jp.Z % P).InvMod(P);
-        x = jp.X * zc % P;
-        y = jp.Y * zd % P;
-        return new EcPoint(x, y);
+        if (jp.Inf) return EcPoint.Infinity;
+        if (jp.Affine) return new EcPoint(jp.X, jp.Y);
+        var zc = BigInteger.ModPow(jp.Z, 2, P).InvMod(P);
+        var zd = BigInteger.ModPow(jp.Z, 3, P).InvMod(P);
+        return new EcPoint(jp.X * zc % P, jp.Y * zd % P);
     }
 
     public bool ValidatePoint(EcPoint p)
     {
-        var lhs = p.Y * p.Y;
-        var rhs = p.X * p.X * p.X % P + A * p.X + B;
-        return lhs % P == rhs % P;
+        var lhs = BigInteger.ModPow(p.Y, 2, P);
+        var rhs = BigInteger.ModPow(p.X, 3, P) + A * p.X + B;
+        return lhs == rhs % P;
     }
 }
 
@@ -378,7 +365,7 @@ public struct JacobianEcPoint
         };
     }
 
-#if NETSTANDARD
+#if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     public static implicit operator JacobianEcPoint(ECPoint p)
     {
         if (p.X == null || p.Y == null)
@@ -393,5 +380,5 @@ public struct JacobianEcPoint
 #endif
 
     public override string ToString() =>
-        Inf ? "EcPoint{O}" : Affine ? $"EcPoint{{X={X:X}, Y={Y:X}}}" : $"EcPoint{{X={X:X}, Y={Y:X}, Z={Z:X}}}";
+        Inf ? "EcPoint(O)" : Affine ? $"EcPoint(X={X:X}, Y={Y:X})" : $"EcPoint(X={X:X}, Y={Y:X}, Z={Z:X})";
 }

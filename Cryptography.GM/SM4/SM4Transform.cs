@@ -85,4 +85,10 @@ public sealed class SM4Transform : EcbTransform
         WriteU32Be(output.Slice(8, 4), x[1]);
         WriteU32Be(output.Slice(12, 4), x[0]);
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Array.Clear(_rk, 0, _rk.Length);
+    }
 }

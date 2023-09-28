@@ -56,7 +56,7 @@ public class NoOpSingleBlockTransform : ICryptoTransform
     [Fact]
     public void MultipleBlocksThrows()
     {
-        Assert.Equal(0, TransformBlock(Array.Empty<byte>(), 0, 0, Array.Empty<byte>(), 0));
+        Assert.Equal(0, TransformBlock(EmptyArray<byte>.Instance, 0, 0, EmptyArray<byte>.Instance, 0));
         var b = new byte[2 * InputBlockSize];
         new Random().NextBytes(b);
         Assert.Equal(InputBlockSize, TransformBlock(b, 0, InputBlockSize, b, InputBlockSize));

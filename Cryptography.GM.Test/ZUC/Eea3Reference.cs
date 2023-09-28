@@ -207,12 +207,12 @@ public class Eea3Reference
         iv[5] = iv[6] = iv[7] = 0;
         Array.Copy(iv, 0, iv, 8, 8);
 
-        var cipher = new Eea3Transform(sk, iv);
+        using var cipher = new Eea3Transform(sk, iv);
         var cipherOutput = new byte[plaintext.Length];
         cipher.TransformBits(plaintext, cipherOutput, bits);
         Assert.Equal(ciphertext, cipherOutput);
 
-        cipher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        cipher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
         Assert.Throws<InvalidOperationException>(() => cipher.TransformBlock(plaintext, 0, bits, cipherOutput, 0));
     }
 
@@ -220,7 +220,7 @@ public class Eea3Reference
     [MemberData(nameof(GenerateRandomTest), 6)]
     public void TestXfrmReuse(byte[] sk, byte[] iv, ZucVersion version, byte[] input)
     {
-        var cipher = new Eea3Transform(sk, iv, true, version);
+        using var cipher = new Eea3Transform(sk, iv, true, version);
         var cipherText = cipher.TransformFinalBlock(input, 0, input.Length);
         var plaintext = cipher.TransformFinalBlock(cipherText, 0, cipherText.Length);
         Assert.Equal(input, plaintext);

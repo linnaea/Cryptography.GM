@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Security.Cryptography;
 
 // ReSharper disable once CheckNamespace
@@ -46,13 +47,11 @@ public sealed class CbcTransform : ICryptoTransform
     private void TransformOneBlock(byte[] inputBuffer, int inputOffset, byte[] outputBuffer, int outputOffset,
                                    bool signalFinalBlock)
     {
-        var imm = new byte[InputBlockSize];
+        var imm = ArrayPool<byte>.Shared.Rent(InputBlockSize);
         Array.Copy(inputBuffer, inputOffset, imm, 0, InputBlockSize);
-        if (!_decrypt) {
-            for (var i = 0; i < InputBlockSize; i++) {
+        if (!_decrypt)
+            for (var i = 0; i < InputBlockSize; i++)
                 imm[i] ^= _lastCipherBlock[i];
-            }
-        }
 
         if (signalFinalBlock) {
             var lastBlock = _ecbNoPad.TransformFinalBlock(imm, 0, InputBlockSize);
@@ -62,26 +61,26 @@ public sealed class CbcTransform : ICryptoTransform
         }
 
         if (_decrypt) {
-            for (var i = 0; i < InputBlockSize; i++) {
+            for (var i = 0; i < InputBlockSize; i++)
                 outputBuffer[outputOffset + i] ^= _lastCipherBlock[i];
-            }
 
             Array.Copy(imm, 0, _lastCipherBlock, 0, InputBlockSize);
         } else {
             Array.Copy(outputBuffer, outputOffset, _lastCipherBlock, 0, InputBlockSize);
         }
+
+        ArrayPool<byte>.Shared.Return(imm);
     }
 
     public byte[] TransformFinalBlock(byte[] inputBuffer, int inputOffset, int inputCount)
     {
         var blocks = inputCount / InputBlockSize;
         var output = new byte[blocks * OutputBlockSize];
-        if (blocks > 1) {
+        if (blocks > 1)
             TransformBlock(inputBuffer, inputOffset, inputCount - InputBlockSize, output, 0);
-        }
 
         if (blocks >= 1) {
-            TransformOneBlock(inputBuffer, inputOffset + inputCount - InputBlockSize, output, output.Length - InputBlockSize, true);
+            TransformOneBlock(inputBuffer, inputOffset + inputCount - InputBlockSize, output, output.Length - OutputBlockSize, true);
         } else {
             output = _ecbNoPad.TransformFinalBlock(inputBuffer, inputOffset, inputCount);
         }
@@ -94,5 +93,18 @@ public sealed class CbcTransform : ICryptoTransform
     public bool CanReuseTransform => _ecbNoPad.CanReuseTransform;
     public int InputBlockSize => _ecbNoPad.InputBlockSize;
     public int OutputBlockSize => _ecbNoPad.OutputBlockSize;
-    public void Dispose() => _ecbNoPad.Dispose();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~CbcTransform() => Dispose(false);
+    private void Dispose(bool disposing)
+    {
+        Array.Clear(_iv, 0, _iv.Length);
+        Array.Clear(_lastCipherBlock, 0, _lastCipherBlock.Length);
+        if (disposing) _ecbNoPad.Dispose();
+    }
 }

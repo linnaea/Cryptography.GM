@@ -16,7 +16,7 @@ public class SM2EncryptionReference
         var d = BigInteger.Parse("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8",
                                  NumberStyles.HexNumber);
         var k = (BigInteger.Parse("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21",
-                                  NumberStyles.HexNumber) - 1).ToByteArray();
+                                  NumberStyles.HexNumber) - BigInteger.Pow(2, 176)).ToByteArray();
         var m = Encoding.ASCII.GetBytes("encryption standard");
         var e = new byte[] {
             0x04, 0x04, 0xEB, 0xFC, 0x71, 0x8E, 0x8D, 0x17, 0x98, 0x62, 0x04, 0x32, 0x26, 0x8E, 0x77, 0xFE,
@@ -29,10 +29,8 @@ public class SM2EncryptionReference
             0x2D, 0x65, 0x1E, 0xFA
         };
 
-        Array.Resize(ref k, k.Length + 13);
-        var rng = new FixedBytesGenerator(k);
-        var a = System.Security.Cryptography.SM2.Create(rng);
-        var b = System.Security.Cryptography.SM2.Create();
+        using var a = System.Security.Cryptography.SM2.Create(new FixedBytesGenerator(k), true);
+        using var b = System.Security.Cryptography.SM2.Create();
 
         b.ImportPrivateKey(d);
         a.ImportPublicKey(b.ExportKey().Q);
@@ -40,7 +38,7 @@ public class SM2EncryptionReference
         Assert.Equal(e, a.EncryptData(m, EcPointFormat.Uncompressed));
         Assert.Equal(m, b.DecryptData(e));
 
-        Assert.Equal(m, b.DecryptData(b.EncryptData(m)));
-        Assert.Equal(m, b.DecryptData(b.EncryptData(m, EcPointFormat.Compressed)));
+        foreach (var pf in Enum.GetValues(typeof(EcPointFormat)))
+            Assert.Equal(m, b.DecryptData(b.EncryptData(m, (EcPointFormat)pf!)));
     }
 }

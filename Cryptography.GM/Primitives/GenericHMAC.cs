@@ -10,33 +10,30 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
     private readonly int _blockBytes;
     private readonly byte[] _rgbInner;
     private readonly byte[] _rgbOuter;
-    private byte[] _keyValue = EmptyArray<byte>.Instance;
     private bool _hashing;
 
     protected readonly T Hasher;
 
-    public sealed override int HashSize => Hasher.HashSize;
-
     public GenericHMAC(T hasher, int blockBytes, byte[] rgbKey)
     {
+        HashSizeValue = hasher.HashSize;
         Hasher = hasher;
         _blockBytes = blockBytes;
         _rgbInner = new byte[blockBytes];
-        _rgbOuter = new byte[blockBytes];
+        _rgbOuter = new byte[blockBytes + (HashSizeValue + 7) / 8];
         Key = rgbKey;
     }
 
     public sealed override byte[] Key {
-        get => (byte[])_keyValue.Clone();
+        get => (byte[])KeyValue.Clone();
         set {
-            if (_hashing) {
-                throw new InvalidOperationException("Cannot change key during hash operation");
-            }
+            if (_hashing)
+                throw new InvalidOperationException("Cannot change key while hashing");
 
             if (value.Length > _blockBytes) {
-                _keyValue = Hasher.ComputeHash(value);
+                KeyValue = Hasher.ComputeHash(value);
             } else {
-                _keyValue = (byte[])value.Clone();
+                KeyValue = (byte[])value.Clone();
             }
 
             for (var i = 0; i < _blockBytes; i++) {
@@ -44,9 +41,9 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
                 _rgbOuter[i] = 0x5C;
             }
 
-            for (var i = 0; i < _keyValue.Length; i++) {
-                _rgbInner[i] ^= _keyValue[i];
-                _rgbOuter[i] ^= _keyValue[i];
+            for (var i = 0; i < KeyValue.Length; i++) {
+                _rgbInner[i] ^= KeyValue[i];
+                _rgbOuter[i] ^= KeyValue[i];
             }
         }
     }
@@ -58,10 +55,15 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
 
     protected virtual void AddHashData(byte[] rgb, int ib, int cb) => Hasher.TransformBlock(rgb, ib, cb, null, 0);
 
-    protected virtual byte[] FinalizeInnerHash()
+    protected virtual int FinalizeInnerHash(Span<byte> hashValueBuf)
     {
         Hasher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
-        return Hasher.Hash;
+        var hash = Hasher.Hash;
+        if (hash.Length != hashValueBuf.Length)
+            throw new InvalidOperationException();
+
+        hash.CopyTo(hashValueBuf);
+        return hash.Length;
     }
 
     private void EnsureStarted()
@@ -78,20 +80,36 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
         AddHashData(rgb, ib, cb);
     }
 
-    protected sealed override byte[] HashFinal()
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    protected override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
+    {
+        bytesWritten = FinalizeHash(destination);
+        return true;
+    }
+#endif
+
+    private int FinalizeHash(Span<byte> destination)
     {
         EnsureStarted();
-        var hashInner = FinalizeInnerHash();
+        FinalizeInnerHash(_rgbOuter.AsSpan(_blockBytes));
         Hasher.Initialize();
-        AddHashData(_rgbOuter, 0, _blockBytes);
-        AddHashData(hashInner, 0, hashInner.Length);
+        AddHashData(_rgbOuter, 0, _rgbOuter.Length);
         _hashing = false;
-        return FinalizeInnerHash();
+        return FinalizeInnerHash(destination);
+    }
+
+    protected sealed override byte[] HashFinal()
+    {
+        var r = new byte[_rgbOuter.Length - _blockBytes];
+        FinalizeHash(r);
+        return r;
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) Hasher.Dispose();
         base.Dispose(disposing);
+        Array.Clear(_rgbInner, 0, _rgbInner.Length);
+        Array.Clear(_rgbOuter, 0, _rgbOuter.Length);
+        if (disposing) Hasher.Dispose();
     }
 }

@@ -14,20 +14,20 @@ public class CbcTransformTest
     [MemberData(nameof(GenerateRandomTest), 3)]
     public void TestCbc(byte[] k, byte[] iv, byte[] d)
     {
-        var aes = Aes.Create();
+        using var aes = Aes.Create();
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.PKCS7;
         var reference = TransformData(aes.CreateEncryptor(k, iv), d);
 
-        var ecb = Aes.Create();
+        using var ecb = Aes.Create();
         ecb.Padding = PaddingMode.None;
         ecb.Mode = CipherMode.ECB;
-        var encChain = new PaddingTransform(new CbcTransform(ecb.CreateEncryptor(k, iv), iv, false), PaddingMode.PKCS7, false);
+        using var encChain = new PaddingTransform(new CbcTransform(ecb.CreateEncryptor(k, iv), iv, false), PaddingMode.PKCS7, false);
         var actual = TransformData(encChain, d);
 
         Assert.Equal(reference, actual);
 
-        var decChain = new PaddingTransform(new CbcTransform(ecb.CreateDecryptor(k, iv), iv, true), PaddingMode.PKCS7, true);
+        using var decChain = new PaddingTransform(new CbcTransform(ecb.CreateDecryptor(k, iv), iv, true), PaddingMode.PKCS7, true);
         var decrypted = TransformData(decChain, actual);
         Assert.Equal(d, decrypted);
     }
@@ -35,9 +35,8 @@ public class CbcTransformTest
     private byte[] TransformData(ICryptoTransform xfrm, byte[] d)
     {
         using var buf = new MemoryStream();
-        using (var cryptStream = new CryptoStream(buf, xfrm, CryptoStreamMode.Write)) {
+        using (var cryptStream = new CryptoStream(buf, xfrm, CryptoStreamMode.Write))
             cryptStream.Write(d, 0, d.Length);
-        }
 
         return buf.ToArray();
     }

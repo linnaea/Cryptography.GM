@@ -31,10 +31,9 @@ public abstract class Zuc256Mac<T> : KeyedHashAlgorithm where T : struct
     }
 
     protected abstract T WordAtBit((T hi, T lo) v, int n);
-    protected abstract (T hi, T lo) ShiftInU32((T hi, T lo) v, uint r);
-    protected abstract T Xor(T l, T r);
-    protected abstract T Mask(T l, int mask);
-    protected abstract byte[] ToBigEndian(T l);
+    protected abstract (T hi, T lo) ShiftInWord((T hi, T lo) v);
+    protected abstract T Xor(T l, T r, bool skip);
+    protected abstract int ToBigEndian(T l, Span<byte> buf);
 
     protected Zuc256Mac(ZucVersion version)
     {
@@ -42,11 +41,13 @@ public abstract class Zuc256Mac<T> : KeyedHashAlgorithm where T : struct
         _cipher = null!;
     }
 
+    protected uint NextU32Key() => _cipher.NextKey();
+
     private T NextWord()
     {
-        while (_p >= HashSize) {
-            _w = ShiftInU32(_w, _cipher.NextKey());
-            _p -= 32;
+        while (_p > HashSize) {
+            _w = ShiftInWord(_w);
+            _p -= (ushort)HashSize;
         }
 
         var w = WordAtBit(_w, _p);
@@ -60,44 +61,68 @@ public abstract class Zuc256Mac<T> : KeyedHashAlgorithm where T : struct
         while (bPos < nBits) {
             var b = bPos % 8;
             var bit = buf[bPos / 8] & (1 << (7 - b));
-            bit <<= b + 24;
-            var k = Mask(NextWord(), bit >> 31);
-            _a = Xor(_a, k);
+            _a = Xor(_a, NextWord(), bit == 0);
             bPos += 1;
         }
     }
 
     public T FinalizeHash()
     {
-        var r = Xor(_a, NextWord());
+        var r = Xor(_a, NextWord(), false);
         _p--;
         return r;
     }
 
-    public byte[] FinalizeHashBytes()
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    protected override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
     {
-        var a = FinalizeHash();
-        return ToBigEndian(a);
+        bytesWritten = FinalizeHash(destination);
+        return true;
+    }
+#endif
+
+    private int FinalizeHash(Span<byte> destination) => ToBigEndian(FinalizeHash(), destination);
+
+    protected override byte[] HashFinal()
+    {
+        var r = new byte[(HashSize + 7) / 8];
+        FinalizeHash(r);
+        return r;
     }
 
-    protected override void HashCore(byte[] array, int ibStart, int cbSize)
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    protected override void HashCore(ReadOnlySpan<byte> source)
+#else
+    private void HashCore(ReadOnlySpan<byte> source)
+#endif
     {
-        while (cbSize > 0) {
-            var loopBytes = Math.Min(cbSize, int.MaxValue / 8);
-            HashBits(new ReadOnlySpan<byte>(array).Slice(ibStart), loopBytes * 8);
-            cbSize -= loopBytes;
-            ibStart += loopBytes;
+        while (!source.IsEmpty) {
+            var loopBytes = Math.Min(source.Length, int.MaxValue / 8);
+            HashBits(source, loopBytes * 8);
+            source = source.Slice(loopBytes);
         }
     }
 
-    protected override byte[] HashFinal() => FinalizeHashBytes();
+    protected override void HashCore(byte[] array, int ibStart, int cbSize) => HashCore(array.AsSpan(ibStart, cbSize));
 
     public override void Initialize()
     {
+        _cipher?.Dispose();
         _cipher = new ZucKeyStreamGenerator(_sk, _iv, _version);
         _p = (ushort)(HashSize * 2);
         _a = NextWord();
         _p += (ushort)HashSize;
         _p--;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Array.Clear(_sk, 0, _sk.Length);
+        Array.Clear(_iv, 0, _iv.Length);
+        _w = default;
+        _p = 0;
+        _a = default;
+        if (disposing) _cipher.Dispose();
     }
 }

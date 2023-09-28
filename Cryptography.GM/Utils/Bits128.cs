@@ -6,16 +6,25 @@ public struct Bits128
     private ulong _lo;
     private ulong _hi;
 
-    public static explicit operator ulong(Bits128 v) => v._lo;
-    public static implicit operator Bits128((ulong hi, ulong lo) pair) => new() { _lo = pair.lo, _hi = pair.hi };
-    public static implicit operator (ulong hi, ulong lo)(Bits128 v) => (v._hi, v._lo);
+    public void Deconstruct(out ulong hi, out ulong lo)
+    {
+        hi = _hi;
+        lo = _lo;
+    }
 
-    public static implicit operator (uint hh, uint hl, uint lh, uint ll)(Bits128 v)
-        => ((uint)(v._hi >> 32), (uint)v._hi, (uint)(v._lo >> 32), (uint)v._lo);
+    public void Deconstruct(out uint hh, out uint hl, out uint lh, out uint ll)
+    {
+        hh = (uint)(_hi >> 32);
+        hl = (uint)_hi;
+        lh = (uint)(_lo >> 32);
+        ll = (uint)_lo;
+    }
 
-    public static implicit operator Bits128((uint hh, uint hl, uint lh, uint ll) v) => new() {
-        _lo = (ulong)v.lh << 32 | v.ll, _hi = (ulong)v.hh << 32 | v.hl
-    };
+    public Bits128(uint hh, uint hl, uint lh, uint ll)
+    {
+        _lo = (ulong)lh << 32 | ll;
+        _hi = (ulong)hh << 32 | hl;
+    }
 
     public static explicit operator Bits128(int v) => new() {
         _lo = (ulong)v,
@@ -75,8 +84,6 @@ public struct Bits128
         _hi = l._hi | r._hi
     };
 
-    public static Bits128 operator |(Bits128 l, ulong r) => l with { _lo = l._lo | r };
-
     public override string ToString() => $"{_hi:x16}{_lo:x16}";
 }
 
@@ -85,74 +92,29 @@ internal struct Bits256
     private Bits128 _lo;
     private Bits128 _hi;
 
+    public void Deconstruct(out ulong hh, out ulong hl, out ulong lh, out ulong ll)
+    {
+        (hh, hl) = _hi;
+        (lh, ll) = _lo;
+    }
+
     public void Deconstruct(out uint hhh, out uint hhl, out uint hlh, out uint hll,
                             out uint lhh, out uint lhl, out uint llh, out uint lll)
     {
-        var tuple = ((uint, uint, uint, uint, uint, uint, uint, uint))this;
-        (hhh, hhl, hlh, hll, lhh, lhl, llh, lll) = tuple;
+        (hhh, hhl, hlh, hll) = _hi;
+        (lhh, lhl, llh, lll) = _lo;
     }
 
-    public static explicit operator Bits128(Bits256 v) => v._lo;
-    public static implicit operator Bits256((Bits128 hi, Bits128 lo) pair) => new() { _lo = pair.lo, _hi = pair.hi };
-    public static implicit operator (Bits128 hi, Bits128 lo)(Bits256 v) => (v._hi, v._lo);
-
-    public static implicit operator (uint hhh, uint hhl, uint hlh, uint hll, uint lhh, uint lhl, uint llh, uint lll)(Bits256 v)
+    public Bits256(uint hhh, uint hhl, uint hlh, uint hll, uint lhh, uint lhl, uint llh, uint lll)
     {
-        (uint hh, uint hl, uint lh, uint ll) l = v._lo;
-        (uint hh, uint hl, uint lh, uint ll) h = v._hi;
-        return (h.hh, h.hl, h.lh, h.ll, l.hh, l.hl, l.lh, l.ll);
-    }
-
-    public static implicit operator Bits256((uint hhh, uint hhl, uint hlh, uint hll, uint lhh, uint lhl, uint llh, uint lll) v)
-        => new() {
-            _hi = (v.hhh, v.hhl, v.hlh, v.hll),
-            _lo = (v.lhh, v.lhl, v.llh, v.lll)
-        };
-
-    public static Bits256 operator >> (Bits256 l, int r)
-    {
-        r %= 256;
-        if (r >= 128) {
-            return new Bits256 {
-                _lo = l._hi >> (r - 128)
-            };
-        }
-
-        if (r > 0) {
-            var hi = l._hi;
-            l._hi >>= r;
-            l._lo >>= r;
-            l._lo |= hi << (128 - r);
-        }
-
-        return l;
-    }
-
-    public static Bits256 operator <<(Bits256 l, int r)
-    {
-        r %= 256;
-        if (r >= 128) {
-            return new Bits256 {
-                _hi = l._lo << (r - 128)
-            };
-        }
-
-        if (r > 0) {
-            var lo = l._lo;
-            l._hi <<= r;
-            l._lo <<= r;
-            l._hi |= lo >> (128 - r);
-        }
-
-        return l;
+        _hi = new Bits128(hhh, hhl, hlh, hll);
+        _lo = new Bits128(lhh, lhl, llh, lll);
     }
 
     public static Bits256 operator ^(Bits256 l, Bits256 r) => new() {
         _lo = l._lo ^ r._lo,
         _hi = l._hi ^ r._hi
     };
-
-    public static Bits256 operator |(Bits256 l, ulong r) => l with { _lo = l._lo | r };
 
     public override string ToString() => $"{_hi}{_lo}";
 }

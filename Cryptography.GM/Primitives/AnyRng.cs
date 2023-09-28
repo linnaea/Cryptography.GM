@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 // ReSharper disable once CheckNamespace
 namespace Cryptography.GM.Primitives;
 
-public abstract class AnyRng
+public abstract class AnyRng : IDisposable
 {
     public abstract void NextBytes(byte[] buf);
 
@@ -29,28 +29,54 @@ public abstract class AnyRng
         return minInclusive + r;
     }
 
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~AnyRng() => Dispose(false);
+    protected virtual void Dispose(bool disposing)
+    { }
+
     public static implicit operator AnyRng(RandomNumberGenerator rng) => new CryptoRngWrapper(rng);
     public static implicit operator AnyRng(BlockDeriveBytes drbg) => new BlockDrbgWrapper(drbg);
-    public static implicit operator AnyRng(DeriveBytes drbg) => new DrbgWrapper(drbg);
+    public static implicit operator AnyRng(DeriveBytes drbg)
+        => drbg is BlockDeriveBytes b ? new BlockDrbgWrapper(b) : new DrbgWrapper(drbg);
 }
 
-internal class CryptoRngWrapper : AnyRng
+internal sealed class CryptoRngWrapper : AnyRng
 {
     private readonly RandomNumberGenerator _rng;
-    internal CryptoRngWrapper(RandomNumberGenerator rng) => _rng = rng;
+    public CryptoRngWrapper(RandomNumberGenerator rng) => _rng = rng;
     public override void NextBytes(byte[] buf) => _rng.GetBytes(buf);
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if(disposing) _rng.Dispose();
+    }
 }
 
-internal class BlockDrbgWrapper : AnyRng
+internal sealed class BlockDrbgWrapper : AnyRng
 {
     private readonly BlockDeriveBytes _rng;
-    internal BlockDrbgWrapper(BlockDeriveBytes rng) => _rng = rng;
+    public BlockDrbgWrapper(BlockDeriveBytes rng) => _rng = rng;
     public override void NextBytes(byte[] buf) => _rng.GetBytes(buf);
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if(disposing) _rng.Dispose();
+    }
 }
 
-internal class DrbgWrapper : AnyRng
+internal sealed class DrbgWrapper : AnyRng
 {
     private readonly DeriveBytes _rng;
-    internal DrbgWrapper(DeriveBytes rng) => _rng = rng;
+    public DrbgWrapper(DeriveBytes rng) => _rng = rng;
     public override void NextBytes(byte[] buf) => Array.Copy(_rng.GetBytes(buf.Length), buf, buf.Length);
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if(disposing) _rng.Dispose();
+    }
 }

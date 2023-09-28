@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
-using System.Security.Cryptography;
 using Cryptography.GM.Primitives;
+// ReSharper disable once RedundantUsingDirective
+using System.Security.Cryptography;
 
 // ReSharper disable once CheckNamespace
 namespace Cryptography.GM.ECMath;
@@ -13,7 +14,7 @@ public interface IEcParameter
     BigInteger H { get; }
     ushort BitLength { get; }
     IEcCurve Curve { get; }
-#if NETSTANDARD
+#if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     ECCurve ToEcCurve();
 #endif
 }
@@ -32,17 +33,44 @@ public interface IEcCurve
 
 public struct EcKeyPair
 {
-    public EcPoint Q { get; set; }
-    public BigInteger D { get; set; }
-    public IEcParameter Param { get; set; }
+    public EcPoint Q { get; init; }
+    public BigInteger D { get; init; }
+    public IEcParameter Param { get; init; }
 
-#if NETSTANDARD
+#if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     public static implicit operator ECParameters(EcKeyPair p) =>
         new() {
             Curve = p.Param.ToEcCurve(),
             D = p.D.ToByteArrayUBe(),
             Q = p.Q
         };
+
+    public static explicit operator EcKeyPair(ECParameters p) =>
+        new() {
+            Param = ParameterFromEcCurve(p.Curve),
+            D = p.D.AsBigUIntBe(),
+            Q = p.Q
+        };
+
+    public static IEcParameter ParameterFromEcCurve(ECCurve curve)
+    {
+        switch (curve.CurveType) {
+        case ECCurve.ECCurveType.Implicit:
+            throw new InvalidOperationException();
+        case ECCurve.ECCurveType.PrimeShortWeierstrass:
+            curve.Validate();
+            return new ShortWeierstrassFpParameter(
+                new ShortWeierstrassFpCurve(
+                    curve.Prime.AsBigUIntBe(), curve.A.AsBigUIntBe(), curve.B.AsBigUIntBe()),
+                curve.G, curve.Order.AsBigUIntBe());
+        case ECCurve.ECCurveType.Characteristic2:
+        case ECCurve.ECCurveType.Named:
+        case ECCurve.ECCurveType.PrimeMontgomery:
+        case ECCurve.ECCurveType.PrimeTwistedEdwards:
+        default:
+            throw new NotSupportedException();
+        }
+    }
 #endif
 }
 
@@ -53,51 +81,76 @@ public enum EcPointFormat
     Uncompressed
 }
 
-public struct EcPoint
+public readonly struct EcPoint : IEquatable<EcPoint>
 {
     public static readonly EcPoint Infinity = default;
 
-    private readonly bool _notInf;
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    private readonly int _xb;
+    private readonly int _yb;
+#else
+    private readonly byte[] _xb;
+    private readonly byte[] _yb;
+#endif
 
     public BigInteger X { get; }
     public BigInteger Y { get; }
 
-    public bool Inf => !_notInf;
+    public bool Inf => _xb == default || _yb == default;
 
     public EcPoint(BigInteger x, BigInteger y)
     {
         X = x;
         Y = y;
-        _notInf = true;
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+        _xb = X.GetByteCount(true);
+        _yb = Y.GetByteCount(true);
+#else
+        _xb = X.ToByteArrayUBe();
+        _yb = Y.ToByteArrayUBe();
+#endif
     }
 
-    public byte[] ToBytes(AsymmetricAlgorithm a, EcPointFormat format = EcPointFormat.Mixed)
-        => ToBytes(format, (a.KeySize + 7) / 8);
-
-    public byte[] ToBytes(EcPointFormat format = EcPointFormat.Mixed, int l = -1)
+    public void WriteBytes(Span<byte> buf, EcPointFormat format = EcPointFormat.Mixed)
     {
         if (Inf) throw new InvalidOperationException();
-        var xb = X.ToByteArrayUBe(l);
-        if (format == EcPointFormat.Compressed) {
-            var r = new byte[xb.Length + 1];
-            xb.CopyTo(r, 1);
-            r[0] = Y.IsEven ? (byte)2 : (byte)3;
-            return r;
-        } else {
-            var yb = Y.ToByteArrayUBe(l);
-            if (l == -1) {
-                return ToBytes(format, Math.Max(xb.Length, yb.Length));
-            }
 
-            var r = new byte[l * 2 + 1];
-            r[0] = format == EcPointFormat.Uncompressed ? (byte)4 : Y.IsEven ? (byte)6 : (byte)7;
-            xb.CopyTo(r, 1);
-            yb.CopyTo(r, l + 1);
-            return r;
+        if (format == EcPointFormat.Compressed) {
+            buf[0] = Y.IsEven ? (byte)2 : (byte)3;
+            CopyBytesToEnd(X, _xb, buf.Slice(1));
+        } else if((buf.Length & 1) != 1) {
+            throw new ArgumentException();
+        } else {
+            var elementLength = buf.Length / 2;
+            buf[0] = format == EcPointFormat.Uncompressed ? (byte)4 : Y.IsEven ? (byte)6 : (byte)7;
+            CopyBytesToEnd(X, _xb, buf.Slice(1, elementLength));
+            CopyBytesToEnd(Y, _yb, buf.Slice(1 + elementLength));
         }
     }
 
-#if NETSTANDARD
+    public void FillBytesX(Span<byte> buf) => CopyBytesToEnd(X, _xb, buf);
+    public void FillBytesY(Span<byte> buf) => CopyBytesToEnd(Y, _yb, buf);
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    private static void CopyBytesToEnd(BigInteger n, int byteLength, Span<byte> tgt)
+        => n.FillBytesUBe(tgt, byteLength);
+#else
+    // ReSharper disable once UnusedParameter.Local
+    private static void CopyBytesToEnd(BigInteger n, byte[] src, Span<byte> tgt)
+    {
+        var p = tgt.Length - src.Length;
+        tgt.Slice(0, p).Clear();
+        src.CopyTo(tgt.Slice(p));
+    }
+#endif
+
+    public byte[] ToBytes(int bitLength, EcPointFormat format = EcPointFormat.Mixed)
+    {
+        var r = new byte[format.SerializedLength((bitLength + 7) / 8)];
+        WriteBytes(r, format);
+        return r;
+    }
+
+#if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     public static implicit operator EcPoint(ECPoint p)
     {
         if (p.X == null || p.Y == null)
@@ -108,9 +161,8 @@ public struct EcPoint
 
     public static implicit operator ECPoint(EcPoint p)
     {
-        if (p.Inf) {
+        if (p.Inf)
             return new ECPoint { X = null, Y = null };
-        }
 
         return new ECPoint {
             X = p.X.ToByteArrayUBe(),
@@ -134,5 +186,5 @@ public struct EcPoint
     public static bool operator !=(EcPoint l, EcPoint r) => !(l == r);
     public override bool Equals(object? obj) => obj is EcPoint other && Equals(other);
     public override int GetHashCode() => Inf ? 0 : (X.GetHashCode() * 397) ^ Y.GetHashCode();
-    public override string ToString() => Inf ? "EcPoint{O}" : $"EcPoint{{X={X:X}, Y={Y:X}}}";
+    public override string ToString() => Inf ? "EcPoint(O)" : $"EcPoint(X={X:X}, Y={Y:X})";
 }

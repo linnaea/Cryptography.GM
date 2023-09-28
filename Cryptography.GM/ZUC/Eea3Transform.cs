@@ -24,4 +24,11 @@ public sealed class Eea3Transform : XorStreamCipherTransform<ZucKeyStreamGenerat
     }
 
     public override bool CanReuseTransform => _initState != null;
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (_initState != null)
+            Array.Clear(_initState, 0, _initState.Length);
+    }
 }
