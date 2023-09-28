@@ -7,7 +7,7 @@ namespace Cryptography.GM.Primitives;
 public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : DeriveBytes
 {
     protected readonly TRng Rng;
-    private byte[] _w = Array.Empty<byte>();
+    private byte[] _w = EmptyArray<byte>.Instance;
     private int _iPos;
     private sbyte _bPos;
 
@@ -92,7 +92,7 @@ public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : Deri
         TransformBlock(inputBuffer, inputOffset, inputCount, buf, 0);
         if (CanReuseTransform) {
             ResetRng();
-            _w = Array.Empty<byte>();
+            _w = EmptyArray<byte>.Instance;
             _iPos = _bPos = 0;
         } else {
             _w = null!;

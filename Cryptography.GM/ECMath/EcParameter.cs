@@ -13,7 +13,9 @@ public interface IEcParameter
     BigInteger H { get; }
     ushort BitLength { get; }
     IEcCurve Curve { get; }
+#if NETSTANDARD
     ECCurve ToEcCurve();
+#endif
 }
 
 public interface IEcCurve
@@ -34,12 +36,14 @@ public struct EcKeyPair
     public BigInteger D { get; set; }
     public IEcParameter Param { get; set; }
 
+#if NETSTANDARD
     public static implicit operator ECParameters(EcKeyPair p) =>
         new() {
             Curve = p.Param.ToEcCurve(),
             D = p.D.ToByteArrayUBe(),
             Q = p.Q
         };
+#endif
 }
 
 public enum EcPointFormat
@@ -93,6 +97,7 @@ public struct EcPoint
         }
     }
 
+#if NETSTANDARD
     public static implicit operator EcPoint(ECPoint p)
     {
         if (p.X == null || p.Y == null)
@@ -112,6 +117,7 @@ public struct EcPoint
             Y = p.Y.ToByteArrayUBe()
         };
     }
+#endif
 
     public bool Equals(EcPoint other)
     {

@@ -26,7 +26,7 @@ public class SM2 : AsymmetricAlgorithm
         _rng = rng;
         _hash = hash;
         _param = param;
-        _ident = Array.Empty<byte>();
+        _ident = EmptyArray<byte>.Instance;
     }
 
     public new static SM2 Create() => Create(new SM3(), RandomNumberGenerator.Create());
@@ -37,7 +37,7 @@ public class SM2 : AsymmetricAlgorithm
     public byte[] Ident {
         get => (byte[])_ident.Clone();
         set {
-            _ident = value ?? Array.Empty<byte>();
+            _ident = value ?? EmptyArray<byte>.Instance;
             _ident = _ident.Length > ushort.MaxValue / 8
                          ? throw new CryptographicException()
                          : (byte[])_ident.Clone();
@@ -340,4 +340,11 @@ public class SM2 : AsymmetricAlgorithm
         return DecryptMessage(c1, c3, c2);
     }
 #endregion
+
+#if NETFRAMEWORK
+    public override string SignatureAlgorithm => throw new NotImplementedException();
+    public override string KeyExchangeAlgorithm => throw new NotImplementedException();
+    public override void FromXmlString(string xmlString) => throw new NotImplementedException();
+    public override string ToXmlString(bool includePrivateParameters) => throw new NotImplementedException();
+#endif
 }

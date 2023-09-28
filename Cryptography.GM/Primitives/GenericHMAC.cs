@@ -10,7 +10,7 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
     private readonly int _blockBytes;
     private readonly byte[] _rgbInner;
     private readonly byte[] _rgbOuter;
-    private byte[] _keyValue = Array.Empty<byte>();
+    private byte[] _keyValue = EmptyArray<byte>.Instance;
     private bool _hashing;
 
     protected readonly T Hasher;
@@ -60,15 +60,14 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
 
     protected virtual byte[] FinalizeInnerHash()
     {
-        Hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        var hash = Hasher.Hash;
-        Hasher.Initialize();
-        return hash;
+        Hasher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
+        return Hasher.Hash;
     }
 
     private void EnsureStarted()
     {
         if (_hashing) return;
+        Hasher.Initialize();
         AddHashData(_rgbInner, 0, _blockBytes);
         _hashing = true;
     }

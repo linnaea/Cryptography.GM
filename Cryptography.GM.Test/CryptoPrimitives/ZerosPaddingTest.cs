@@ -1,4 +1,3 @@
-using System.Linq;
 using Cryptography.GM.Primitives;
 using Xunit;
 

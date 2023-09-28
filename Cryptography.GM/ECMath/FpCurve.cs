@@ -26,6 +26,7 @@ public class FpParameter : IEcParameter
 
     IEcCurve IEcParameter.Curve => Curve;
 
+#if NETSTANDARD
     ECCurve IEcParameter.ToEcCurve() => this;
 
     public static implicit operator ECCurve(FpParameter p) =>
@@ -38,6 +39,7 @@ public class FpParameter : IEcParameter
             Cofactor = new byte[] { 1 },
             Order = p.N.ToByteArrayUBe()
         };
+#endif
 
     // ReSharper disable once InconsistentNaming
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
@@ -376,6 +378,7 @@ public struct JacobianEcPoint
         };
     }
 
+#if NETSTANDARD
     public static implicit operator JacobianEcPoint(ECPoint p)
     {
         if (p.X == null || p.Y == null)
@@ -387,6 +390,7 @@ public struct JacobianEcPoint
             Z = BigInteger.One
         };
     }
+#endif
 
     public override string ToString() =>
         Inf ? "EcPoint{O}" : Affine ? $"EcPoint{{X={X:X}, Y={Y:X}}}" : $"EcPoint{{X={X:X}, Y={Y:X}, Z={Z:X}}}";

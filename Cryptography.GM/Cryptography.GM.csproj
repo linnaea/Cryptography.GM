@@ -4,11 +4,12 @@
         <LangVersion>10</LangVersion>
         <Nullable>enable</Nullable>
         <RootNamespace>System.Security.Cryptography</RootNamespace>
-        <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;netstandard2.1;net45</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="System.Memory" Version="4.5.5" Condition="$(TargetFramework) == 'netstandard2.0'" />
+      <PackageReference Include="System.Memory" Version="4.5.5" Condition="$(TargetFramework) != 'netstandard2.1'" />
+      <PackageReference Include="System.ValueTuple" Version="4.5.0" Condition="$(TargetFramework) == 'net45'" />
     </ItemGroup>
 
 </Project>

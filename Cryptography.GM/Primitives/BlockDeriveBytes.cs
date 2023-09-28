@@ -7,7 +7,7 @@ namespace Cryptography.GM.Primitives;
 
 public abstract class BlockDeriveBytes : DeriveBytes
 {
-    private byte[] _remaining = Array.Empty<byte>();
+    private byte[] _remaining = EmptyArray<byte>.Instance;
 
     public abstract int BlockSize { get; }
     public abstract void NextBlock(Span<byte> buf);
@@ -24,7 +24,7 @@ public abstract class BlockDeriveBytes : DeriveBytes
 
         Array.Copy(_remaining, buf, _remaining.Length);
         var offset = _remaining.Length;
-        _remaining = Array.Empty<byte>();
+        _remaining = EmptyArray<byte>.Instance;
 
         while (offset < cb) {
             var toCopy = Math.Min(cb - offset, BlockSize);
@@ -52,6 +52,6 @@ public abstract class BlockDeriveBytes : DeriveBytes
 
     public override void Reset()
     {
-        _remaining = Array.Empty<byte>();
+        _remaining = EmptyArray<byte>.Instance;
     }
 }

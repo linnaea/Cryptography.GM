@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using Cryptography.GM.Primitives;
 using Xunit;

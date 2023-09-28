@@ -184,7 +184,7 @@ public static class BitOps
             if (dstUnaligned == 8) {
                 dst = dst.Slice(1);
             } else {
-                return Array.Empty<byte>();
+                return EmptyArray<byte>.Instance;
             }
 
             bitLength -= toCopy;
