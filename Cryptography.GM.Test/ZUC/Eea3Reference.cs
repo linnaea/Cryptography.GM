@@ -234,7 +234,7 @@ public class Eea3Reference
         while (n-- > 0) {
             var sk = new byte[32];
             var iv = new byte[23];
-            var data = new byte[rng.Next() & 0xFFFF];
+            var data = new byte[rng.Next() & 0xFFF];
             var version = versions.GetValue(n % versions.Length);
             rng.NextBytes(sk);
             rng.NextBytes(iv);

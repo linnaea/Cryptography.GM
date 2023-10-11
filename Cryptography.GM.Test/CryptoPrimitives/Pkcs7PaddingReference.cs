@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using Cryptography.GM.Primitives;
@@ -17,7 +18,9 @@ public class Pkcs7PaddingReference
         using var blkCipher = new NoOpSingleBlockTransform(blockSize);
         using var enc = new PaddingTransform(blkCipher, PaddingMode.PKCS7, false);
         using var dec = new PaddingTransform(blkCipher, PaddingMode.PKCS7, true);
-        var padded = enc.TransformFinalBlock(input, 0, input.Length);
+        var x2 = new byte[input.Length + 2];
+        Array.Copy(input, 0, x2, 1, input.Length);
+        var padded = enc.TransformFinalBlock(x2, 1, input.Length);
         Assert.Equal(reference, padded);
 
         using (var unPadded = new MemoryStream()) {

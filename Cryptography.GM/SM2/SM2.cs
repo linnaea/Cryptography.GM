@@ -25,12 +25,14 @@ public sealed class SM2 : AsymmetricAlgorithm
     private byte[] _ident;
     private byte[]? _z;
 
+    public new static SM2 Create() => new();
+    public static SM2 Create(AnyRng rng, bool disposeRng = false) => new(rng: rng, disposeRng: disposeRng);
     public SM2(IEcParameter? param = null, HashAlgorithm? hash = null, AnyRng? rng = null, bool disposeRng = false, bool disposeHash = false)
     {
         _disposeRng = disposeRng || rng == null;
         _disposeHash = disposeHash || hash == null;
         rng ??= RandomNumberGenerator.Create();
-        hash ??= new SM3();
+        hash ??= SM3.Create();
 
         if (!hash.CanReuseTransform || !hash.CanTransformMultipleBlocks || hash.InputBlockSize != 1)
             throw new ArgumentException(nameof(hash));
@@ -41,9 +43,6 @@ public sealed class SM2 : AsymmetricAlgorithm
         _param = null!;
         ChangeParameter(param ?? StandardParam);
     }
-
-    public new static SM2 Create() => new();
-    public static SM2 Create(AnyRng rng, bool disposeRng = false) => new(rng: rng, disposeRng: disposeRng);
 
     [AllowNull]
     public byte[] Ident {
@@ -92,7 +91,7 @@ public sealed class SM2 : AsymmetricAlgorithm
 
     public void ImportKey(EcKeyPair kp)
     {
-        if (kp.Param?.N.IsZero == true) {
+        if (kp.Param != null) {
             ChangeParameter(kp.Param);
         }
 

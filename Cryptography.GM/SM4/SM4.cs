@@ -7,6 +7,7 @@ namespace System.Security.Cryptography;
 
 public sealed class SM4 : SymmetricAlgorithm
 {
+    public new static SM4 Create() => new();
     public SM4()
     {
         LegalKeySizesValue = new[] { new KeySizes(128, 128, 0) };

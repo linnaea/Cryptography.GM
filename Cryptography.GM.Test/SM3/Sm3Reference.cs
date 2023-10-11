@@ -78,7 +78,7 @@ public class Sm3Reference
     })]
     public void Sm3Vector(byte[] hash, byte[] data)
     {
-        using var hasher = new System.Security.Cryptography.SM3();
+        using var hasher = System.Security.Cryptography.SM3.Create();
         var rng = new Random();
         var offset = 0;
         while (offset < data.Length) {

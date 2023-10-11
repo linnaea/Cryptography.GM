@@ -91,9 +91,9 @@ public class XorStreamCipherTransform<TRng> : ICryptoTransform where TRng : Deri
     {
         var buf = new byte[inputCount];
         TransformBlock(inputBuffer, inputOffset, inputCount, buf, 0);
+        Array.Clear(_w, 0, _w.Length);
         if (CanReuseTransform) {
             ResetRng();
-            Array.Clear(_w, 0, _w.Length);
             _w = EmptyArray<byte>.Instance;
             _iPos = _bPos = 0;
         } else {

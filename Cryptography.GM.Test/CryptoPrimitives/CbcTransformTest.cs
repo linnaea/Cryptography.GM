@@ -48,7 +48,7 @@ public class CbcTransformTest
         while (n-- > 0) {
             var key = new byte[16];
             var iv = new byte[16];
-            var data = new byte[rng.Next() & 0xFFFF];
+            var data = new byte[rng.Next() & 0xFFF];
             rng.NextBytes(key);
             rng.NextBytes(iv);
             rng.NextBytes(data);

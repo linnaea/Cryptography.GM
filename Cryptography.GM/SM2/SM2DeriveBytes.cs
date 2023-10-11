@@ -13,7 +13,7 @@ public sealed class SM2DeriveBytes : BlockDeriveBytes
     {
         _key = new byte[key.Length + 4];
         _disposeHash = disposeHash || hash == null;
-        _hasher = hash ?? new SM3();
+        _hasher = hash ?? SM3.Create();
         key.CopyTo(_key);
     }
 

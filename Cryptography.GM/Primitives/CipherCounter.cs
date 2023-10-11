@@ -14,8 +14,10 @@ public sealed class CtrTransform : XorStreamCipherTransform<CipherCounterRng>
 public sealed class CipherCounterRng : BlockDeriveBytes
 {
     private readonly ICryptoTransform _ecbNoPad;
-    private readonly byte[] _iv;
-    private readonly byte[] _ctr;
+    // ReSharper disable MemberInitializerValueIgnored
+    private readonly byte[] _iv = EmptyArray<byte>.Instance;
+    private readonly byte[] _ctr = EmptyArray<byte>.Instance;
+    // ReSharper restore MemberInitializerValueIgnored
 
     public CipherCounterRng(ICryptoTransform ecbNoPad, byte[] iv)
     {
@@ -33,12 +35,9 @@ public sealed class CipherCounterRng : BlockDeriveBytes
     {
         var bounce = ArrayPool<byte>.Shared.Rent(_ecbNoPad.OutputBlockSize);
         _ecbNoPad.TransformBlock(_ctr, 0, _ctr.Length, bounce, 0);
-        var acc = 1;
-        for (var i = _ctr.Length - 1; i >= 0; i--) {
-            var sum = _ctr[i] + acc;
-            _ctr[i] = (byte)sum;
-            acc = (sum >> 8) & 1;
-        }
+        for (var i = _ctr.Length - 1; i >= 0; i--)
+            if (++_ctr[i] != 0)
+                break;
 
         bounce.AsSpan(0, _ecbNoPad.OutputBlockSize).CopyTo(buf);
         ArrayPool<byte>.Shared.Return(bounce);

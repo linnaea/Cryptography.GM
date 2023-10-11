@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
 using Cryptography.GM.Primitives;
 using Cryptography.GM;
 using static Cryptography.GM.BitOps;
@@ -17,6 +16,7 @@ public sealed class SM3 : HashAlgorithm
     private Bits256 _state;
     private ulong _blockCount;
 
+    public new static SM3 Create() => new();
     public SM3()
     {
         HashSizeValue = 256;
@@ -154,7 +154,7 @@ public sealed class SM3 : HashAlgorithm
 [SuppressMessage("ReSharper", "IdentifierTypo")]
 public sealed class HMACSM3 : GenericHMAC<SM3>
 {
-    public HMACSM3(byte[] rgbKey) : base(new SM3(), SM3.BlockSize / 8, rgbKey)
+    public HMACSM3(byte[] rgbKey) : base(SM3.Create(), SM3.BlockSize / 8, rgbKey)
     { }
 
     protected override int FinalizeInnerHash(Span<byte> hashValueBuf)

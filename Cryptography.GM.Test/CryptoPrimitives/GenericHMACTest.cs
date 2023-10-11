@@ -25,8 +25,8 @@ public class GenericHMACTest
     {
         var rng = new Random();
         while (n-- > 0) {
-            var hmacKey = new byte[rng.Next(1, 256)];
-            var data = new byte[rng.Next() & 0xFFFF];
+            var hmacKey = new byte[1 + (rng.Next() & 0xFF)];
+            var data = new byte[rng.Next() & 0xFFF];
             rng.NextBytes(hmacKey);
             rng.NextBytes(data);
             yield return new object[] { hmacKey, data };

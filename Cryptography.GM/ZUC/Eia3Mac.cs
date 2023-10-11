@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Cryptography.GM;
 
 namespace System.Security.Cryptography;
@@ -98,6 +97,7 @@ public sealed class Eia3Mac : KeyedHashAlgorithm
     }
 #endif
 
+    // ReSharper disable once UnusedMethodReturnValue.Local
     private int FinalizeHash(Span<byte> destination)
     {
         if (destination.Length < 4)
@@ -116,6 +116,7 @@ public sealed class Eia3Mac : KeyedHashAlgorithm
 
     public override void Initialize()
     {
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         _cipher?.Dispose();
         _cipher = new ZucKeyStreamGenerator(_sk, _iv, _version);
         _p = 64;

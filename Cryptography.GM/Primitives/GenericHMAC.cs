@@ -81,13 +81,14 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
     }
 
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
-    protected override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
+    protected sealed override bool TryHashFinal(Span<byte> destination, out int bytesWritten)
     {
         bytesWritten = FinalizeHash(destination);
         return true;
     }
 #endif
 
+    // ReSharper disable once UnusedMethodReturnValue.Local
     private int FinalizeHash(Span<byte> destination)
     {
         EnsureStarted();

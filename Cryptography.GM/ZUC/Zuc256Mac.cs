@@ -81,6 +81,7 @@ public abstract class Zuc256Mac<T> : KeyedHashAlgorithm where T : struct
     }
 #endif
 
+    // ReSharper disable once UnusedMethodReturnValue.Local
     private int FinalizeHash(Span<byte> destination) => ToBigEndian(FinalizeHash(), destination);
 
     protected override byte[] HashFinal()
@@ -107,6 +108,7 @@ public abstract class Zuc256Mac<T> : KeyedHashAlgorithm where T : struct
 
     public override void Initialize()
     {
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         _cipher?.Dispose();
         _cipher = new ZucKeyStreamGenerator(_sk, _iv, _version);
         _p = (ushort)(HashSize * 2);

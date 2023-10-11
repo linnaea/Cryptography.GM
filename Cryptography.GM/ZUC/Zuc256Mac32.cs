@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Cryptography.GM;
 
 namespace System.Security.Cryptography;

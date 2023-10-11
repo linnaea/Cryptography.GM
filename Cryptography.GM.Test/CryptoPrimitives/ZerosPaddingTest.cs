@@ -1,3 +1,4 @@
+using System;
 using Cryptography.GM.Primitives;
 using Xunit;
 
@@ -18,7 +19,9 @@ public class ZerosPaddingTest
         Assert.True(enc.CanReuseTransform);
         Assert.False(enc.CanTransformMultipleBlocks);
 
-        var padded = enc.TransformFinalBlock(input, 0, input.Length);
+        var x2 = new byte[input.Length + 2];
+        Array.Copy(input, 0, x2, 1, input.Length);
+        var padded = enc.TransformFinalBlock(x2, 1, input.Length);
         Assert.Equal(reference, padded);
     }
 }
