@@ -58,7 +58,7 @@ public class GenericHMAC<T> : HMAC where T : HashAlgorithm
     protected virtual int FinalizeInnerHash(Span<byte> hashValueBuf)
     {
         Hasher.TransformFinalBlock(EmptyArray<byte>.Instance, 0, 0);
-        var hash = Hasher.Hash;
+        var hash = Hasher.Hash!;
         if (hash.Length != hashValueBuf.Length)
             throw new InvalidOperationException();
 

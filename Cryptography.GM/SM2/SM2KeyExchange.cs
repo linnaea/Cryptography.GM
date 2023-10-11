@@ -31,7 +31,7 @@ public sealed class SM2KeyExchange : IDisposable
     public (SM2DeriveBytes? Key, byte[] Verifier, byte[] PeerVerifier) DeriveKey(
         EcPoint peerPubKey, EcPoint peerR, ReadOnlySpan<byte> peerIdent)
     {
-        if (!_ephemeralKey.Param.Curve.ValidatePoint(peerPubKey))
+        if (!_ephemeralKey.Param!.Curve.ValidatePoint(peerPubKey))
             throw new CryptographicException();
 
         if (!_ephemeralKey.Param.Curve.ValidatePoint(peerR))
@@ -74,19 +74,19 @@ public sealed class SM2KeyExchange : IDisposable
         ra.FillBytesY(xv); _hash.TransformBlock(key, 0, pkBytes, null, 0);
         rb.FillBytesX(xv); _hash.TransformBlock(key, 0, pkBytes, null, 0);
         rb.FillBytesY(xv); _hash.TransformFinalBlock(key, 0, pkBytes);
-        var si = _hash.Hash;
+        var si = _hash.Hash!;
 
         key[pkBytes - 1] = 2;
         _hash.Initialize();
         _hash.TransformBlock(key, pkBytes - 1, pkBytes + 1, null, 0);
         _hash.TransformFinalBlock(si, 0, si.Length);
-        var sb = _hash.Hash;
+        var sb = _hash.Hash!;
 
         key[pkBytes - 1] = 3;
         _hash.Initialize();
         _hash.TransformBlock(key, pkBytes - 1, pkBytes + 1, null, 0);
         _hash.TransformFinalBlock(si, 0, si.Length);
-        var sa = _hash.Hash;
+        var sa = _hash.Hash!;
 
         _hash.Initialize();
         return (kdf, _responder ? sb : sa, _responder ? sa : sb);

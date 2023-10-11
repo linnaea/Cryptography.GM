@@ -129,7 +129,7 @@ internal static class BitOps
         }
 
         if (!r.IsOne)
-            throw new InvalidOperationException();
+            throw new ArithmeticException();
 
         if (t < 0)
             t += n;

@@ -43,7 +43,6 @@ public sealed class SM2 : AsymmetricAlgorithm
     }
 
     public new static SM2 Create() => new();
-    public static SM2 Create(HashAlgorithm hash, bool disposeHash = false) => new(hash: hash, disposeHash: disposeHash);
     public static SM2 Create(AnyRng rng, bool disposeRng = false) => new(rng: rng, disposeRng: disposeRng);
 
     [AllowNull]
@@ -134,29 +133,45 @@ public sealed class SM2 : AsymmetricAlgorithm
 
     public (EcPoint Point, int Bytes) PointFromBytes(ReadOnlySpan<byte> p)
     {
+        var dataLen = _pubKeyBytes + 1;
+        if (p.Length < dataLen) throw new InvalidDataException("Too short");
+
         var x = p.Slice(1, _pubKeyBytes).AsBigUIntBe();
         switch (p[0]) {
         case 2:
         case 3:
-            return (new EcPoint(x, _param.Curve.SolveY(x, p[0] == 3, _rng)), _pubKeyBytes + 1);
+            try {
+                return (new EcPoint(x, _param.Curve.SolveY(x, p[0] == 3)), dataLen);
+            }
+            catch (ArithmeticException e) {
+                throw new InvalidDataException("Not a valid point", e);
+            }
         case 4:
         case 6:
         case 7: {
+            dataLen += _pubKeyBytes;
+            if (p.Length < dataLen) throw new InvalidDataException("Too short");
+
             var y = p.Slice(1 + _pubKeyBytes, _pubKeyBytes).AsBigUIntBe();
             var point = new EcPoint(x, y);
 
             if (p[0] != 4) {
-                if (y != _param.Curve.SolveY(x, p[0] == 7, _rng))
-                    throw new InvalidDataException();
+                try {
+                    if (y != _param.Curve.SolveY(x, p[0] == 7))
+                        throw new InvalidDataException("Not a valid point");
+                }
+                catch (ArithmeticException e) {
+                    throw new InvalidDataException("Not a valid point", e);
+                }
             } else {
                 if (!_param.Curve.ValidatePoint(point))
-                    throw new InvalidDataException();
+                    throw new InvalidDataException("Not a valid point on curve");
             }
 
-            return (point, _pubKeyBytes * 2 + 1);
+            return (point, dataLen);
         }
         default:
-            throw new InvalidDataException();
+            throw new InvalidDataException("Invalid format");
         }
     }
 
@@ -182,7 +197,7 @@ public sealed class SM2 : AsymmetricAlgorithm
         param.G.FillBytesY(pkBuffer); hash.TransformBlock(z, 0, pkBytes, null, 0);
         pubKey.FillBytesX(pkBuffer); hash.TransformBlock(z, 0, pkBytes, null, 0);
         pubKey.FillBytesY(pkBuffer); hash.TransformFinalBlock(z, 0, pkBytes);
-        var zHash = hash.Hash;
+        var zHash = hash.Hash!;
         hash.Initialize();
 
         ArrayPool<byte>.Shared.Return(z);
@@ -293,7 +308,7 @@ public sealed class SM2 : AsymmetricAlgorithm
         Array.Clear(c3Data, 0, message.Length);
         ArrayPool<byte>.Shared.Return(c3Data);
 
-        var c3 = _hash.Hash;
+        var c3 = _hash.Hash!;
         _hash.Initialize();
         return c3;
     }
@@ -358,7 +373,6 @@ public sealed class SM2 : AsymmetricAlgorithm
     {
         base.Dispose(disposing);
         _privateKey = default;
-        _pubKey = default;
         if (_disposeRng && disposing) _rng.Dispose();
         if (_disposeHash && disposing) _hash.Dispose();
     }

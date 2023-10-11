@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Numerics;
 using Cryptography.GM.Primitives;
 // ReSharper disable once RedundantUsingDirective
@@ -51,6 +49,7 @@ public class ShortWeierstrassFpCurve : IEcCurve
 
     private readonly BigInteger _inv2;
     private readonly BigInteger _eulerPower;
+    private readonly BigInteger _nonResidue;
 
     public BigInteger P { get; }
     public BigInteger A { get; }
@@ -63,32 +62,30 @@ public class ShortWeierstrassFpCurve : IEcCurve
         A = a;
         B = b;
         BitLength = (ushort)p.GetBitLength();
-        _eulerPower = (p - 1) / 2;
-        _inv2 = 2;
-        _inv2 = _inv2.InvMod(p);
+        _eulerPower = p / 2; // (p-1)/2
+        _inv2 = _eulerPower + 1; // (p+1)/2
+
+        _nonResidue = 2;
+        while (IsQuadraticResidue(_nonResidue))
+            _nonResidue++;
     }
 
     private bool IsQuadraticResidue(BigInteger v) => BigInteger.ModPow(v, _eulerPower, P).IsOne;
 
-    private BigInteger Sqrt(BigInteger x, AnyRng rng)
+    private BigInteger Sqrt(BigInteger x)
     {
         if (!IsQuadraticResidue(x))
-            throw new InvalidOperationException();
-
-        BigInteger z;
-        do {
-            z = rng.NextBigInt(BigInteger.One, P);
-        } while (IsQuadraticResidue(z));
+            throw new ArithmeticException("Operand is not quadratic residue");
 
         var q = _eulerPower;
-        ulong s = 1;
+        var s = 1ul;
         while (q.IsEven) {
             s++;
             q /= 2;
         }
 
         var m = s;
-        var c = BigInteger.ModPow(z, q, P);
+        var c = BigInteger.ModPow(_nonResidue, q, P);
         var t = BigInteger.ModPow(x, q, P);
         var r = BigInteger.ModPow(x, q / 2 + 1, P);
         while (true) {
@@ -100,7 +97,7 @@ public class ShortWeierstrassFpCurve : IEcCurve
                 return r;
             }
 
-            ulong i = 1;
+            var i = 1ul;
             while (i < m) {
                 if (BigInteger.ModPow(t, BigInteger.ModPow(2, i, P), P).IsOne)
                     break;
@@ -108,7 +105,7 @@ public class ShortWeierstrassFpCurve : IEcCurve
             }
 
             if (i == m)
-                throw new InvalidOperationException();
+                throw new ArithmeticException();
 
             var b = BigInteger.ModPow(c, BigInteger.ModPow(2, m - i - 1, P), P);
             m = i;
@@ -118,11 +115,10 @@ public class ShortWeierstrassFpCurve : IEcCurve
         }
     }
 
-    public BigInteger SolveY(BigInteger x, bool lsbSet, AnyRng rng)
+    public BigInteger SolveY(BigInteger x, bool lsbSet)
     {
         var rhs = BigInteger.ModPow(x, 3, P) + A * x + B;
-        rhs %= P;
-        var r = Sqrt(rhs, rng);
+        var r = Sqrt(rhs % P);
 
         if (r.IsZero) return r;
         if (lsbSet == r.IsEven) r = P - r;
@@ -198,6 +194,7 @@ public class ShortWeierstrassFpCurve : IEcCurve
         return kl;
     }
 
+    // https://doi.org/10.1155/2013/862508
     public JacobianEcPoint MultiplyAndAdd(BigInteger k, JacobianEcPoint p, BigInteger m, JacobianEcPoint s, AnyRng rng)
     {
         if (k.Sign < 0) {
@@ -247,7 +244,7 @@ public class ShortWeierstrassFpCurve : IEcCurve
                 mm[i] = 0x20;
                 break;
             default:
-                throw new Exception();
+                throw new ArithmeticException();
             }
         }
 
@@ -341,6 +338,8 @@ public class ShortWeierstrassFpCurve : IEcCurve
         var rhs = BigInteger.ModPow(p.X, 3, P) + A * p.X + B;
         return lhs == rhs % P;
     }
+
+    public override string ToString() => $"ShortWeierstrassCurve y^2=x^3+Ax+B over Fp (A={A}, B={B}, P={P})";
 }
 
 public struct JacobianEcPoint

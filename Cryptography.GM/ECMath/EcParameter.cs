@@ -24,7 +24,7 @@ public interface IEcCurve
     BigInteger A { get; }
     BigInteger B { get; }
     ushort BitLength { get; }
-    BigInteger SolveY(BigInteger x, bool lsbSet, AnyRng rng);
+    BigInteger SolveY(BigInteger x, bool lsbSet);
     JacobianEcPoint Multiply(BigInteger k, JacobianEcPoint p, AnyRng rng);
     JacobianEcPoint MultiplyAndAdd(BigInteger k, JacobianEcPoint p, BigInteger m, JacobianEcPoint s, AnyRng rng);
     EcPoint ToAffine(JacobianEcPoint jp);
@@ -35,12 +35,12 @@ public struct EcKeyPair
 {
     public EcPoint Q { get; init; }
     public BigInteger D { get; init; }
-    public IEcParameter Param { get; init; }
+    public IEcParameter? Param { get; init; }
 
 #if NETSTANDARD || NETCOREAPP || NET47_OR_GREATER
     public static implicit operator ECParameters(EcKeyPair p) =>
         new() {
-            Curve = p.Param.ToEcCurve(),
+            Curve = p.Param?.ToEcCurve() ?? new ECCurve { CurveType = ECCurve.ECCurveType.Implicit },
             D = p.D.ToByteArrayUBe(),
             Q = p.Q
         };
@@ -48,7 +48,7 @@ public struct EcKeyPair
     public static explicit operator EcKeyPair(ECParameters p) =>
         new() {
             Param = ParameterFromEcCurve(p.Curve),
-            D = p.D.AsBigUIntBe(),
+            D = p.D?.AsBigUIntBe() ?? BigInteger.Zero,
             Q = p.Q
         };
 
@@ -56,13 +56,15 @@ public struct EcKeyPair
     {
         switch (curve.CurveType) {
         case ECCurve.ECCurveType.Implicit:
-            throw new InvalidOperationException();
+            return null!;
         case ECCurve.ECCurveType.PrimeShortWeierstrass:
             curve.Validate();
             return new ShortWeierstrassFpParameter(
                 new ShortWeierstrassFpCurve(
-                    curve.Prime.AsBigUIntBe(), curve.A.AsBigUIntBe(), curve.B.AsBigUIntBe()),
-                curve.G, curve.Order.AsBigUIntBe());
+                    curve.Prime?.AsBigUIntBe() ?? throw new InvalidCastException(),
+                    curve.A?.AsBigUIntBe() ?? throw new InvalidCastException(),
+                    curve.B?.AsBigUIntBe() ?? throw new InvalidCastException()),
+                curve.G, curve.Order?.AsBigUIntBe() ?? throw new InvalidCastException());
         case ECCurve.ECCurveType.Characteristic2:
         case ECCurve.ECCurveType.Named:
         case ECCurve.ECCurveType.PrimeMontgomery:
