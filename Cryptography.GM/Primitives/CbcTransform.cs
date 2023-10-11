@@ -44,8 +44,7 @@ public sealed class CbcTransform : ICryptoTransform
         return inputCount;
     }
 
-    private void TransformOneBlock(byte[] inputBuffer, int inputOffset, byte[] outputBuffer, int outputOffset,
-                                   bool signalFinalBlock)
+    private void TransformOneBlock(byte[] inputBuffer, int inputOffset, byte[] outputBuffer, int outputOffset, bool isFinalBlock)
     {
         var imm = ArrayPool<byte>.Shared.Rent(InputBlockSize);
         Array.Copy(inputBuffer, inputOffset, imm, 0, InputBlockSize);
@@ -53,7 +52,7 @@ public sealed class CbcTransform : ICryptoTransform
             for (var i = 0; i < InputBlockSize; i++)
                 imm[i] ^= _lastCipherBlock[i];
 
-        if (signalFinalBlock) {
+        if (isFinalBlock) {
             var lastBlock = _ecbNoPad.TransformFinalBlock(imm, 0, InputBlockSize);
             Array.Copy(lastBlock, 0, outputBuffer, outputOffset, InputBlockSize);
         } else {

@@ -132,7 +132,7 @@ public sealed class SM2 : AsymmetricAlgorithm
         };
     }
 
-    internal (EcPoint Point, int Bytes) PointFromBytes(ReadOnlySpan<byte> p)
+    public (EcPoint Point, int Bytes) PointFromBytes(ReadOnlySpan<byte> p)
     {
         var x = p.Slice(1, _pubKeyBytes).AsBigUIntBe();
         switch (p[0]) {
@@ -290,20 +290,18 @@ public sealed class SM2 : AsymmetricAlgorithm
         xy.FillBytesX(c3Data.AsSpan(0, _pubKeyBytes)); _hash.TransformBlock(c3Data, 0, _pubKeyBytes, null, 0);
         message.CopyTo(c3Data); _hash.TransformBlock(c3Data, 0, message.Length, null, 0);
         xy.FillBytesY(c3Data.AsSpan(0, _pubKeyBytes)); _hash.TransformFinalBlock(c3Data, 0, _pubKeyBytes);
-        var c3 = _hash.Hash;
-        _hash.Initialize();
+        Array.Clear(c3Data, 0, message.Length);
         ArrayPool<byte>.Shared.Return(c3Data);
 
+        var c3 = _hash.Hash;
+        _hash.Initialize();
         return c3;
     }
 
     public (EcPoint c1MsgKey, byte[] c3Sig, byte[] c2Cipher) EncryptMessage(ReadOnlySpan<byte> message)
     {
-        if (!HasPublicKey)
-            throw new InvalidOperationException();
-
-        if (_param.Curve.Multiply(_param.H, _pubKey, _rng).Inf)
-            throw new CryptographicException();
+        if (!HasPublicKey) throw new InvalidOperationException();
+        if (_param.Curve.Multiply(_param.H, _pubKey, _rng).Inf) throw new CryptographicException();
 
         var k = _rng.NextBigInt(_pkBound, _param.N - _pkBound);
         var c1 = _param.Curve.ToAffine(_param.Curve.Multiply(k, _param.G, _rng));
