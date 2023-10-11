@@ -55,19 +55,11 @@ internal static class BitOps
 #endif
     }
 
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
+    public static byte[] ToByteArrayUBe(this BigInteger x) => x.ToByteArray(true, true);
+#else
     public static byte[] ToByteArrayUBe(this BigInteger x, int len = -1)
     {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP
-        var xb = x.ToByteArray(true, true);
-        if (len < 0) return xb;
-
-        if (xb.Length > len) throw new OverflowException();
-        if (xb.Length == len) return xb;
-
-        var buf = new byte[len];
-        Array.Copy(xb, 0, buf, len - xb.Length, xb.Length);
-        return buf;
-#else
         if (x.Sign < 0) throw new OverflowException();
         var xb = x.ToByteArray();
         if (len >= 0) {
@@ -82,8 +74,8 @@ internal static class BitOps
 
         Array.Reverse(xb);
         return xb;
-#endif
     }
+#endif
 
     public static BigInteger AsBigUIntBe(this byte[] x)
     {
